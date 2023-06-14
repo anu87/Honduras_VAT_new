@@ -320,28 +320,28 @@ server <- function(input, output) {
   # })
   
   #Vax sites------
-  output$vax_sites <- renderLeaflet({
-    
-    leaflet(vax_sites) %>%
-      addProviderTiles("OpenStreetMap") %>%
-      leaflet::addCircles(color = "black",
-                          fillOpacity = 1,
-                          radius = 500,
-                          stroke = F)
-    
-    # tmap::tm_basemap(c(OpenStreetMap = "OpenStreetMap",
-    #              Satellite = "Esri.WorldImagery",
-    #              Dark = "CartoDB.DarkMatter")) +
-    # tmap::tm_shape(vax_sites) +
-    #   tmap::tm_dots()
-    
-  })
-  
-  
-  # #RHOT
-  output$vax_stock_rhot <- renderRHandsontable({
-    rhandsontable(salmi_data, readOnly = T)
-  })
+  # output$vax_sites <- renderLeaflet({
+  #   
+  #   leaflet(vax_sites) %>%
+  #     addProviderTiles("OpenStreetMap") %>%
+  #     leaflet::addCircles(color = "black",
+  #                         fillOpacity = 1,
+  #                         radius = 500,
+  #                         stroke = F)
+  #   
+  #   # tmap::tm_basemap(c(OpenStreetMap = "OpenStreetMap",
+  #   #              Satellite = "Esri.WorldImagery",
+  #   #              Dark = "CartoDB.DarkMatter")) +
+  #   # tmap::tm_shape(vax_sites) +
+  #   #   tmap::tm_dots()
+  #   
+  # })
+  # 
+  # 
+  # # #RHOT
+  # output$vax_stock_rhot <- renderRHandsontable({
+  #   rhandsontable(salmi_data, readOnly = T)
+  # })
   # 
   
   #Historic-----
@@ -518,7 +518,7 @@ server <- function(input, output) {
     })
   })
   
-  # model map-------
+  # model map
   # output$dist_map <-  renderLeaflet({
   #   
   #   flows2 <- gcIntermediate(connections2[,c("lat1", "lon1")], 

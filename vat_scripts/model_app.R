@@ -7,8 +7,8 @@ vat.model <- function(days_allocated = days_allocated_value){
   master_key_adult <- readRDS("appdata/master_key_adult.rds")
   batch_list <- readRDS("appdata/batch_list.rds")
   mun_list <- readRDS("appdata/mun_list.rds")
-  warehouse_codes <- readRDS("data/warehouse_codes.rds")
-  vax_network_codes <- readRDS('data/site_mun_dep_codes.rds')
+  warehouse_codes <- readRDS("appdata/warehouse_codes.rds")
+  vax_network_codes <- readRDS('appdata/site_mun_dep_codes.rds')
   
   
   master_key_adult$vax_admin_const <- round(master_key_adult$avg*days_allocated, 0)
