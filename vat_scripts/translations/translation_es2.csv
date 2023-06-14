@@ -1,0 +1,41 @@
+﻿en,es
+Select language,Seleccionar idioma
+Vaccine Allocation Tool,Herramienta de asignación de vacunas
+Home,Inicio 
+Vaccine Stock Data,Datos sobre existencias de vacunas
+Distribution Network,Red de distribución
+Proposed Distribution,Distribución propuesta
+Historic Data,Datos históricos
+Model Documentation,Documentación del modelo
+Honduras Vaccine Allocation Tool,Herramienta de asignación de vacunas en Honduras
+Data Overview,Resumen de datos
+"The vaccine allocation tool is an interactive tool that takes in data from multiple sources, optimizes for various supply and demand-side constraints and generates a recommended vaccine allocation per site. The final goal of this tool is to maximize vaccine coverage in priority population and minimize any vaccine wastage.","La herramienta de asignación de vacunas es una herramienta interactiva que toma datos de múltiples fuentes, optimiza las diversas limitaciones de la oferta y la demanda y genera una asignación de vacunas recomendada por centro. El objetivo final de esta herramienta es maximizar la cobertura vacunal en la población prioritaria y minimizar cualquier desperdicio de vacunas."
+"This dashboard was developed in collaboration with xyz. It is intended to walk through data inputs and methodology for the vaccine allocation tool, and facilitate the collection of feedback from stakeholders.",Este cuadro de mando se ha desarrollado en colaboración con xyz. Su objetivo es mostrar los datos y la metodología de la herramienta de asignación de vacunas y facilitar la recopilación de comentarios de las partes interesadas.
+This dashboard can be viewed in English or Spanish.,Este cuadro de mandos puede consultarse en inglés o español.
+English,Inglés 
+Spanish,Español
+Edit the table to change stock input data,Editar la tabla para modificar los datos de entrada de existencias
+Save,Guardar 
+Reset,Restablecer
+Vaccine stocks updated,Actualización de las existencias de vacunas
+Vaccine stocks reset,Restablecimiento de las existencias de vacunas
+Upload New Data,Cargar nuevos datos
+Distribution Network: Maps of distribution centers and vaccination sites,Red de distribución: Mapas de centros de distribución y lugares de vacunación
+SALMI Depot to Regional Distribution Network,Depósito SALMI en la red de distribución regional
+Vaccination Sites,Centros de vacunación
+Construct the Optimization Model,Construir el modelo de optimización
+Allocation Duration,Asignación Duración
+How many days of vaccine supply do you want to allocate? E.g. the next 30 days or the next 60 days,"¿Cuántos días de suministro de vacunas desea asignar? Por ejemplo, los próximos 30 días o los próximos 60 días."
+Number of Days:,Número de días:
+Run Model and View Proposed Distribution,Ejecutar el modelo y ver la distribución propuesta
+The model may take a few minutes to run. The maps will display once the model is done running.,El modelo puede tardar unos minutos en ejecutarse. Los mapas se mostrarán una vez que el modelo haya terminado de ejecutarse.
+Run Model,Modelo de ejecución
+The model has finished generating outputs. You can view the model outputs below and download them.,El modelo ha terminado de generar resultados. Puede ver los resultados del modelo a continuación y descargarlos.
+Vaccine Allocation proposed by the model,Asignación de vacunas propuesta por el modelo
+Download,Descargar
+The below map shows the allocation of vaccines from the distribution centers to the vaccination sites.,El siguiente mapa muestra la distribución de las vacunas desde los centros de distribución hasta los puntos de vacunación.
+Proposed Allocation with District Filter,Asignación propuesta con filtro de distrito
+"If you would like to look at one district at a time, use the filter below.","Si desea consultar los distritos de uno en uno, utilice el filtro siguiente."
+Select the District:,Seleccione el Distrito:
+Select the Date:,Seleccione la fecha:
+Select the Variable of Interest:,Seleccione la variable de interés:
