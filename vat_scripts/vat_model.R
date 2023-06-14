@@ -1,6 +1,5 @@
 
-source("~/Honduras_VAT/start-up.R")
-# source("~/Honduras_VAT/Honduras_VAT/SALMI_data.R")
+source("start-up.R")
 
          # datasets to create------
 # add average vax data to mun file; anywhere daily average is < 1, make it 5 (mean) - so that they atleast get some vaccines

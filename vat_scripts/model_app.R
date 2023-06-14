@@ -104,11 +104,9 @@ vat.model <- function(days_allocated = days_allocated_value){
   # pull out results -----------------------------------------------------------
   
   master_key_adult <- master_key_adult |> left_join(warehouse_codes, by= 'warehouse_code')
-  allocation <- allocation |> 
-    left_join(vax_network_codes |> dplyr::select(mun_name, mun_code), by='mun_code')
-  
-  allocation <- 
   
   allocation <- cbind.data.frame(master_key_adult, vax_allocated = get.variables(lp.vat))
   
+  allocation <- allocation |> 
+    left_join(vax_network_codes |> dplyr::select(mun_name, mun_code), by='mun_code')
 }
