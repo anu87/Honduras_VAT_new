@@ -20,7 +20,7 @@ renv::isolate()
 # load data sets ----------------------------------------------------------
 
 #Load new translator
-i18n <- Translator$new(translation_csvs_path = "vat_scripts/translations")
+i18n <- Translator$new(translation_csvs_path = "translations")
 i18n$set_translation_language("en")
 i18n$use_js()
 
@@ -147,16 +147,14 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                  fluidRow( 
                    box(width = 6,
                        status = "warning", solidHeader = TRUE, collapsible = FALSE,
-                       p(i18n$t("SALMI Depot to Regional Distribution Network"), style="text-align:center;font-weight:bold")
-                       # ,
-                       # leafletOutput("full_network", height = 600)
+                       p(i18n$t("SALMI Depot to Regional Distribution Network"), style="text-align:center;font-weight:bold"),
+                        leafletOutput("full_network", height = 600)
                        )
                        ,
                    box(width = 6,
                        status = "warning", solidHeader = TRUE, collapsible = FALSE,
-                       p(i18n$t("Vaccination Sites"),style="text-align:center;font-weight:bold")
-                       # ,
-                       # leafletOutput("vax_sites", height = 600)
+                       p(i18n$t("Vaccination Sites"),style="text-align:center;font-weight:bold"),
+                        leafletOutput("vax_sites", height = 600)
                  ))
                )
       ),
@@ -184,11 +182,11 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                             div(id='run_model_message', verbatimTextOutput("run_model_text")))
                    )
                  ),
-                 # tags$br(), tags$br(),
-                 # box(width = 12,
-                 #     leafletOutput("dist_map", height = 600)
-                 #     ),
-             
+                 tags$br(), tags$br(),
+                 box(width = 12,
+                     leafletOutput("dist_map", height = 600)
+                     ),
+
                  tags$br(), tags$br(),
                  # fluidRow("La carte et le tableau ci-dessous présentent les résultats du modèle. Les sites de vaccination et les sites de distribution sont représentés par des couleurs différentes. Cliquez sur l'un des sites pour obtenir plus d'informations sur le nombre de vaccins qu'ils ont reçus."),
                  # fluidRow("(The map and table below display the outputs from the model. The vaccination sites and distribution sites are represented by different colors. Click on any of the sites to view more information about how many vaccines they recieved.)"),
@@ -251,73 +249,73 @@ server <- function(input, output) {
   
   
   # # network map ----------
-  # output$full_network <- renderLeaflet({
-  #   # 
-  #   
-  #   # remove rows where origin and destination warehouse are the same
-  #   connections <- connections |> 
-  #     filter(if_all(`origin warehouse`, ~.x != `destination warehouse`))
-  #   
-  #   
-  #   
-  #   names(connections)
-  #   flows <- gcIntermediate(connections[,c("Latitude1", "Longitude1")], 
-  #                           connections[,c("Latitude2", "Longitude2")],
-  #                           sp = T,
-  #                           addStartEnd = T)
-  #   flows$Hours <- connections$Hours
-  #   flows$origins <- connections$`origin warehouse`
-  #   flows$destinations <- connections$`destination warehouse`
-  #   
-  #   
-  #   hover <- paste0(flows$origins, " a ", 
-  #                   flows$destinations, ': ')
-  #   
-  #   pal <- colorFactor(brewer.pal(4, "Set2"), flows$origins)
-  #   
-  #   origin_wh <-  connections |> 
-  #     dplyr::select(`origin warehouse`, Longitude1, Latitude1) |> 
-  #     st_as_sf(coords = c("Latitude1", "Longitude1"))
-  #   
-  #   dest_wh <-  connections |> 
-  #     filter(!(`destination warehouse` %in% `origin warehouse`)) |> 
-  #     dplyr::select(`destination warehouse`, Longitude2, Latitude2) |> 
-  #     st_as_sf(coords = c("Latitude2", "Longitude2"))
-  #   
-  #   flow_leaflet <-leaflet() %>%
-  #     addProviderTiles("OpenStreetMap") %>%
-  #     addPolylines(data = flows, 
-  #                  # label = hover,
-  #                  group = ~origins, color = ~pal(origins)) %>%
-  #     addCircleMarkers(data = origin_wh, radius = 2, label = ~as.character(`origin warehouse`)) |>
-  #     addCircleMarkers(data = dest_wh, radius = 1, color = 'red', label = ~as.character(`destination warehouse`)) |>
-  #     addLayersControl(overlayGroups = unique(flows$origins),
-  #                      options = layersControlOptions(collapsed = T))
-  #   
-  #   # flows <- gcIntermediate(connections[,c("Latitude1", "Longitude1")], 
-  #   #                         connections[,c("Latitude2", "Longitude2")],
-  #   #                         sp = T,
-  #   #                         addStartEnd = T)
-  #   # flows$Hours <- connections$Hours
-  #   # flows$origins <- connections$`origin warehouse`
-  #   # flows$destinations <- connections$`destination warehouse`
-  #   # 
-  #   # 
-  #   # hover <- paste0(flows$origins, " a ", 
-  #   #                 flows$destinations, ': ')
-  #   # 
-  #   # pal <- colorFactor(brewer.pal(4, "Set2"), flows$origins)
-  #   # 
-  #   # flow_leaflet <-leaflet() %>%
-  #   #   addProviderTiles("OpenStreetMap") %>%
-  #   #   addPolylines(data = flows, label = hover,
-  #   #                group = ~origins, color = ~pal(origins)) %>%
-  #   #   addLayersControl(overlayGroups = unique(flows$origins),
-  #   #                    options = layersControlOptions(collapsed = T))
-  #   # 
-  #   flow_leaflet
-  #   
-  # })
+  output$full_network <- renderLeaflet({
+    #
+
+    # remove rows where origin and destination warehouse are the same
+    connections <- connections |>
+      filter(if_all(`origin warehouse`, ~.x != `destination warehouse`))
+
+
+
+    names(connections)
+    flows <- gcIntermediate(connections[,c("Latitude1", "Longitude1")],
+                            connections[,c("Latitude2", "Longitude2")],
+                            sp = T,
+                            addStartEnd = T)
+    flows$Hours <- connections$Hours
+    flows$origins <- connections$`origin warehouse`
+    flows$destinations <- connections$`destination warehouse`
+
+
+    hover <- paste0(flows$origins, " a ",
+                    flows$destinations, ': ')
+
+    pal <- colorFactor(brewer.pal(4, "Set2"), flows$origins)
+
+    origin_wh <-  connections |>
+      dplyr::select(`origin warehouse`, Longitude1, Latitude1) |>
+      st_as_sf(coords = c("Latitude1", "Longitude1"))
+
+    dest_wh <-  connections |>
+      filter(!(`destination warehouse` %in% `origin warehouse`)) |>
+      dplyr::select(`destination warehouse`, Longitude2, Latitude2) |>
+      st_as_sf(coords = c("Latitude2", "Longitude2"))
+
+    flow_leaflet <-leaflet() %>%
+      addProviderTiles("OpenStreetMap") %>%
+      addPolylines(data = flows,
+                   # label = hover,
+                   group = ~origins, color = ~pal(origins)) %>%
+      addCircleMarkers(data = origin_wh, radius = 2, label = ~as.character(`origin warehouse`)) |>
+      addCircleMarkers(data = dest_wh, radius = 1, color = 'red', label = ~as.character(`destination warehouse`)) |>
+      addLayersControl(overlayGroups = unique(flows$origins),
+                       options = layersControlOptions(collapsed = T))
+
+    # flows <- gcIntermediate(connections[,c("Latitude1", "Longitude1")],
+    #                         connections[,c("Latitude2", "Longitude2")],
+    #                         sp = T,
+    #                         addStartEnd = T)
+    # flows$Hours <- connections$Hours
+    # flows$origins <- connections$`origin warehouse`
+    # flows$destinations <- connections$`destination warehouse`
+    #
+    #
+    # hover <- paste0(flows$origins, " a ",
+    #                 flows$destinations, ': ')
+    #
+    # pal <- colorFactor(brewer.pal(4, "Set2"), flows$origins)
+    #
+    # flow_leaflet <-leaflet() %>%
+    #   addProviderTiles("OpenStreetMap") %>%
+    #   addPolylines(data = flows, label = hover,
+    #                group = ~origins, color = ~pal(origins)) %>%
+    #   addLayersControl(overlayGroups = unique(flows$origins),
+    #                    options = layersControlOptions(collapsed = T))
+    #
+    flow_leaflet
+
+  })
   
   #Vax sites------
   output$vax_sites <- renderLeaflet({
@@ -519,42 +517,42 @@ server <- function(input, output) {
   })
   
   # model map-------
-  # output$dist_map <-  renderLeaflet({
-  #   
-  #   flows2 <- gcIntermediate(connections2[,c("lat1", "lon1")], 
-  #                           connections2[,c("lat2", "lon2")],
-  #                           sp = T,
-  #                           addStartEnd = T)
-  #   
-  #   
-  #   flows2$origins <- connections2$mun_name
-  #   flows2$destinations <- connections2$Almacen
-  #   
-  #   
-  #   hover <- paste0(flows2$origins, " a ", 
-  #                   flows2$destinations, ': ')
-  #   
-  #   pal <- colorFactor(brewer.pal(4, "Set2"), flows2$origins)
-  #   
-  #   origin_almacen <-  connections2 |> 
-  #     dplyr::select(Almacen, lon2, lat2) |> 
-  #     st_as_sf(coords = c("lat2", "lon2"))
-  #   
-  #   dest_mun <-  connections2 |> 
-  #     dplyr::select(mun_name, lon1, lat1) |> 
-  #     st_as_sf(coords = c("lat1", "lon1"))
-  #   
-  #   leaflet() %>%
-  #     addProviderTiles("OpenStreetMap") %>%
-  #     addPolylines(data = flows2, 
-  #                  # label = hover,
-  #                  group = ~origins, color = ~pal(origins)) %>%
-  #     addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(Almacen)) |>
-  #     addCircleMarkers(data = dest_mun, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
-  #     addLayersControl(overlayGroups = unique(flows2$origins),
-  #                      options = layersControlOptions(collapsed = T))
-  #   
-  # })
+  output$dist_map <-  renderLeaflet({
+
+    flows2 <- gcIntermediate(connections2[,c("lat1", "lon1")],
+                            connections2[,c("lat2", "lon2")],
+                            sp = T,
+                            addStartEnd = T)
+
+
+    flows2$origins <- connections2$mun_name
+    flows2$destinations <- connections2$Almacen
+
+
+    hover <- paste0(flows2$origins, " a ",
+                    flows2$destinations, ': ')
+
+    pal <- colorFactor(brewer.pal(4, "Set2"), flows2$origins)
+
+    origin_almacen <-  connections2 |>
+      dplyr::select(Almacen, lon2, lat2) |>
+      st_as_sf(coords = c("lat2", "lon2"))
+
+    dest_mun <-  connections2 |>
+      dplyr::select(mun_name, lon1, lat1) |>
+      st_as_sf(coords = c("lat1", "lon1"))
+
+    leaflet() %>%
+      addProviderTiles("OpenStreetMap") %>%
+      addPolylines(data = flows2,
+                   # label = hover,
+                   group = ~origins, color = ~pal(origins)) %>%
+      addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(Almacen)) |>
+      addCircleMarkers(data = dest_mun, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
+      addLayersControl(overlayGroups = unique(flows2$origins),
+                       options = layersControlOptions(collapsed = T))
+
+  })
   
   output$prop_dist_dt <- DT::renderDT({
     allocation() |> 

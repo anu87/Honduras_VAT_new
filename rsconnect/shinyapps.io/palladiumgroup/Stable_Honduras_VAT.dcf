@@ -1,0 +1,14 @@
+name: Stable_Honduras_VAT
+title: Stable_Honduras_VAT
+username:
+account: palladiumgroup
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 9315039
+bundleId: 7350140
+url: https://palladiumgroup.shinyapps.io/Stable_Honduras_VAT/
+when: 1686844078.06369
+lastSyncTime: 1686844078.0637
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: new_app.R
