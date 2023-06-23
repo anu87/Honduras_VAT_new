@@ -70,20 +70,19 @@ salmi_inventory2$Dep[salmi_inventory2$Dep == "Santa Barbara Externo"] <- "Santa 
 salmi_inventory2$Dep[salmi_inventory2$Dep == "ALM REGIONAL DE BIOLOGICOS SANTA BARBARA EXTERNO"] <- "ALM REGIONAL DE BIOLOGICOS SANTA BARBARA"
 
 
+
+
+# create uid for vaccine type because lot N is not unique
+# some batches have two types of Pfizer - tapa morada, tapa gris
+
+salmi_inventory2 <- salmi_inventory2 |> 
+  mutate(batch_num = case_when(
+           Suministro == "Pfizer adulto 6 dosis (Vacuna: COVID-19) tapa morada" & category == "vaccine" ~ paste0(`Nº de Lote`,'_', 'morada'), 
+           Suministro == "Pfizer pediatrica 10 dosis (Vacuna: COVID-19) tapa naranja"  & category == "vaccine"~ paste0(`Nº de Lote`,'_', 'naranja'),
+           Suministro == "Pfizer adulto diluida 6 dosis (Vacuna: COVID-19) tapa gris" & category == "vaccine" ~ paste0(`Nº de Lote`,'_', 'gris'),
+           Suministro == "Pfizer Ped. (6 meses - 4 años) 10 dosis (Vacuna: COVID-19) tapa marron" & category == "vaccine" ~ paste0(`Nº de Lote`,'_', 'marron'),
+           .default = `Nº de Lote`
+         ))
+
 saveRDS(salmi_inventory2, 'data/salmi_inventory2.rds')
-
-# salmi_inventory2 <-  salmi_inventory2 |> 
-#   group_by(Almacen, `U. de Emisión`, `Nº de Lote`, `Fecha Vto`, exp_date, time_to_exp, vax_type, category) |> 
-#   summarise(Cantidad = sum(Cantidad, na.rm = TRUE), .groups = 'drop')
-  
-  
-# salmi_inventory2 |> distinct(Suministro) |> view()
-
-
-# add region code to Salmi ------------------------------------------------
-# to join with mun level vaccination file
-
-unique(salmi_inventory2$Almacen)
-
-
-
+saveRDS(salmi_inventory2, 'appdata/salmi_inventory2.rds')

@@ -12,15 +12,18 @@ library(geosphere)
 library(lubridate)
 library(DT)
 library(dplyr)
+library(lpSolveAPI)
+library(tibble)
+library(MASS)
 #setwd("~/Honduras_VAT/Honduras_VAT")
 
 
-#Load new translator
+#Load new translator ---------
 i18n <- Translator$new(translation_csvs_path = "translations")
 i18n$set_translation_language("en")
 i18n$use_js()
 
-#Theme content --> source in from other script
+#Theme content --> source in from other script --------
 #Make pretty at some point
 old_flag_col <- "#0d3b99"
 new_flag_col <- "#00bce4" 
@@ -35,22 +38,30 @@ honduras_theme <- bs_theme(
 )
 
 
-#Data load --> temp data until final version
+#Data load -------
+# > temp data until final version
 #stock_data <- readRDS("data/")
-vax_sites <- readRDS("data/Sites_w_Coords.rds")
-historic_site_data <- readRDS("data/Site_Hist.rds")
-historic_mun_data <- readRDS("data/joined_adm2.rds")
-historic_dep_data <- readRDS("data/joined_adm1.rds")
+vax_sites <- readRDS("appdata/Sites_w_Coords.rds")
+historic_site_data <- readRDS("appdata/Site_Hist.rds")
+historic_mun_data <- readRDS("appdata/joined_adm2.rds")
+historic_dep_data <- readRDS("appdata/joined_adm1.rds")
 
 
-joined_sites <- readRDS("data/joined_sites.rds")
-#low_leaflet <- readRDS("data/flow_leaflet.rds")
-connections <- readxl::read_xlsx("data/travel time matrix between warehouses.xlsx", sheet = 2)
+joined_sites <- readRDS("appdata/joined_sites.rds")
+#low_leaflet <- readRDS("appdata/flow_leaflet.rds")
+connections <- readxl::read_xlsx("appdata/travel time matrix between warehouses.xlsx", sheet = 2)
 
-salmi_data <- readxl::read_xlsx("data/SALMI HON Inventario Biologicos_2022-01-13. Vaccine Inventory .xlsx")
+salmi_data <- readxl::read_xlsx("appdata/SALMI HON Inventario Biologicos_2022-01-13. Vaccine Inventory .xlsx")
 salmi_data <- salmi_data[,1:7]
 colnames(salmi_data) <- salmi_data[3,]
 salmi_data <- salmi_data[-c(1:3),]
+connections2 <- readRDS("appdata/connections.rds")
+
+# source model function ---------------------------------------------------
+source("vat_scripts/model_app.R")
+
+# ui ----------------------------------------------------------------------
+
 
 ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                 navbarPage(title = div(selectInput(inputId = "selected_language", 
@@ -169,8 +180,11 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                              )
                            ),
                            tags$br(), tags$br(),
-                           # fluidRow("La carte et le tableau ci-dessous présentent les résultats du modèle. Les sites de vaccination et les sites de distribution sont représentés par des couleurs différentes. Cliquez sur l'un des sites pour obtenir plus d'informations sur le nombre de vaccins qu'ils ont reçus."),
-                           # fluidRow("(The map and table below display the outputs from the model. The vaccination sites and distribution sites are represented by different colors. Click on any of the sites to view more information about how many vaccines they recieved.)"),
+                           box(width = 12,
+                               leafletOutput("dist_map", height = 500)
+                           ),
+                           tags$br(), tags$br(),
+
                            box(width = 12,
                                p(strong(i18n$t("Vaccine Allocation proposed by the model"), style = "font-size:25px;font-weight:bold")), 
                                p(i18n$t("The below map shows the allocation of vaccines from the distribution centers to the vaccination sites.")),
@@ -178,14 +192,15 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                #leafletOutput("prop_dist", height = 600),
                                DTOutput("prop_dist_dt", height = 600),
                                downloadButton("vax_allocation_download", label = i18n$t("Download"))
-                           ),
-                           box(
-                             title = i18n$t("Proposed Allocation with District Filter"), width = 12,
-                             h5(i18n$t("If you would like to look at one district at a time, use the filter below.")),
-                             selectInput("district_selection", i18n$t("Select the District:"), c("Placeholders", "List", "For", "Now")),
-                             status = "warning", solidHeader = TRUE, collapsible = FALSE,
-                             leafletOutput("prop_dist_filt", height = 600)
                            )
+                           # ,
+                           # box(
+                           #   title = i18n$t("Proposed Allocation with District Filter"), width = 12,
+                           #   h5(i18n$t("If you would like to look at one district at a time, use the filter below.")),
+                           #   selectInput("district_selection", i18n$t("Select the District:"), c("Placeholders", "List", "For", "Now")),
+                           #   status = "warning", solidHeader = TRUE, collapsible = FALSE,
+                           #   leafletOutput("prop_dist_filt", height = 600)
+                           # )
                          )
                 ),
                 
@@ -273,27 +288,6 @@ server <- function(input, output) {
       addLayersControl(overlayGroups = unique(flows$origins),
                        options = layersControlOptions(collapsed = T))
     
-    # flows <- gcIntermediate(connections[,c("Latitude1", "Longitude1")], 
-    #                         connections[,c("Latitude2", "Longitude2")],
-    #                         sp = T,
-    #                         addStartEnd = T)
-    # flows$Hours <- connections$Hours
-    # flows$origins <- connections$`origin warehouse`
-    # flows$destinations <- connections$`destination warehouse`
-    # 
-    # 
-    # hover <- paste0(flows$origins, " a ", 
-    #                 flows$destinations, ': ')
-    # 
-    # pal <- colorFactor(brewer.pal(4, "Set2"), flows$origins)
-    # 
-    # flow_leaflet <-leaflet() %>%
-    #   addProviderTiles("OpenStreetMap") %>%
-    #   addPolylines(data = flows, label = hover,
-    #                group = ~origins, color = ~pal(origins)) %>%
-    #   addLayersControl(overlayGroups = unique(flows$origins),
-    #                    options = layersControlOptions(collapsed = T))
-    # 
     flow_leaflet
     
   })
@@ -307,13 +301,6 @@ server <- function(input, output) {
                           fillOpacity = 1,
                           radius = 500,
                           stroke = F)
-    
-    # tmap::tm_basemap(c(OpenStreetMap = "OpenStreetMap",
-    #              Satellite = "Esri.WorldImagery",
-    #              Dark = "CartoDB.DarkMatter")) +
-    # tmap::tm_shape(vax_sites) +
-    #   tmap::tm_dots()
-    
   })
   
   
@@ -359,6 +346,89 @@ server <- function(input, output) {
     out <- paste(final_month, final_age, dose, sep = "_")
     
     return(out)
+  })
+  # VAT model ---------------------------------------------------------------
+  # save days allocated
+  days_allocated_value <- eventReactive(input$run_model, {
+    days_allocated_value <- input$days_allocated_input
+  })
+  
+  # run the model
+  allocation <- eventReactive(input$run_model, {
+    # source the model script
+    days_allocated_value <- days_allocated_value()
+    allocation <- vat.model(days_allocated = days_allocated_value)
+    
+    allocation <- allocation %>% 
+      relocate(mun_name, .after = mun_code) %>% 
+      relocate(region_name, .after = mun_name) %>% 
+      relocate(Almacen, .after = region_name) %>% 
+      relocate(Suministro, .after = Almacen)
+  })
+  
+  
+  
+  # display the model finished message-------
+  
+  proposed_distribution <- reactiveValues(dt = DT::datatable(salmi_data))
+  
+  observeEvent(input$run_model, {
+    toggle('run_model_message')
+    
+    numdays <- input$days_allocated_input
+    
+    #proposed_distribution$dt <- proposed_dist
+    
+    output$run_model_text <- renderText({
+      i18n$t("The model has finished generating outputs. You can view the model outputs below and download them.")
+    })
+  })
+  
+  # model map-----
+  output$dist_map <-  renderLeaflet({
+    
+    flows2 <- gcIntermediate(connections2[,c("lat1", "lon1")], 
+                             connections2[,c("lat2", "lon2")],
+                             sp = T,
+                             addStartEnd = T)
+    
+    
+    flows2$origins <- connections2$mun_name
+    flows2$destinations <- connections2$Almacen
+    
+    
+    hover <- paste0(flows2$origins, " a ", 
+                    flows2$destinations, ': ')
+    
+    pal <- colorFactor(brewer.pal(4, "Set2"), flows2$origins)
+    
+    origin_almacen <-  connections2 |> 
+      dplyr::select(Almacen, lon2, lat2) |> 
+      st_as_sf(coords = c("lat2", "lon2"))
+    
+    dest_mun <-  connections2 |> 
+      dplyr::select(mun_name, lon1, lat1) |> 
+      st_as_sf(coords = c("lat1", "lon1"))
+    
+    leaflet() %>%
+      addProviderTiles("OpenStreetMap") %>%
+      addPolylines(data = flows2, 
+                   # label = hover,
+                   group = ~origins, color = ~pal(origins)) %>%
+      addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(Almacen)) |>
+      addCircleMarkers(data = dest_mun, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
+      addLayersControl(overlayGroups = unique(flows2$origins),
+                       options = layersControlOptions(collapsed = T))
+    
+  })
+  
+  # display the allocation table -------
+  
+  output$prop_dist_dt <- DT::renderDT({
+    allocation() |> 
+      dplyr::select(mun_code, mun_name, region_name, Almacen, Suministro, batch_num, avg, 
+                    vax_admin_const, eligible_atleast_1dose,vax_allocated) %>% 
+      rename(Municipality = mun_name, vax_doses_allocated = vax_allocated)
   })
   
   #Render historic data map-----------
@@ -426,29 +496,6 @@ server <- function(input, output) {
                                       "<br>",
                                       "Número de Dosis: ", 
                                       filtered_sites$num_doses)) 
-    
-    
-    # tmap::tm_basemap(c(OpenStreetMap = "OpenStreetMap",
-    #              Satellite = "Esri.WorldImagery",
-    #              Dark = "CartoDB.DarkMatter")) +
-    #   tmap::tm_shape(filtered_dep) +
-    #     tmap::tm_fill(col = "num_doses",
-    #             alpha = 0.5,
-    #             palette = "Greens",
-    #             style = "jenks",
-    #             id = "ADM1_ES",
-    #             popup.vars = c("ADM1_ES", "num_doses")) +
-    #     tmap::tm_borders() +
-    #   tmap::tm_shape(filtered_mun) +
-    #     tmap::tm_fill(col = "num_doses") +
-    # tmap::tm_shape(filtered_sites) +
-    #   tmap::tm_dots(size = "num_doses", 
-    #           alpha = 0,
-    #           border.col = "black",
-    #           border.lwd = 0.8,
-    #           border.alpha = 1,
-    #           id = "Nombre US",
-    #           popup.vars = c("Nombre US", "codigo_us", "num_doses")) 
   })
   
   #Show save success message when new data saved
@@ -467,25 +514,7 @@ server <- function(input, output) {
     })
   })
   
-  # display the model finished message-------
   
-  proposed_distribution <- reactiveValues(dt = DT::datatable(salmi_data))
-  
-  observeEvent(input$run_model, {
-    toggle('run_model_message')
-    
-    numdays <- input$days_allocated_input
-    
-    #proposed_distribution$dt <- proposed_dist
-    
-    output$run_model_text <- renderText({
-      i18n$t("The model has finished generating outputs. You can view the model outputs below and download them.")
-    })
-  })
-  
-  output$prop_dist_dt <- DT::renderDT({
-    proposed_distribution$dt
-  })
   
   
 }

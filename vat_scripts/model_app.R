@@ -9,7 +9,10 @@ vat.model <- function(days_allocated = days_allocated_value){
   mun_list <- readRDS("appdata/mun_list.rds")
   warehouse_codes <- readRDS("appdata/warehouse_codes.rds")
   vax_network_codes <- readRDS('appdata/site_mun_dep_codes.rds')
+  connections <- readRDS("appdata/connections.rds")
+  salmi_app_data <- readRDS("appdata/salmi_app_data.rds")
   
+  salmi_inventory2 <- readRDS("appdata/salmi_inventory2.rds")
   
   master_key_adult$vax_admin_const <- round(master_key_adult$avg*days_allocated, 0)
   
@@ -107,6 +110,20 @@ vat.model <- function(days_allocated = days_allocated_value){
   
   allocation <- cbind.data.frame(master_key_adult, vax_allocated = get.variables(lp.vat))
   
+  allocation <- allocation %>% 
+    filter(vax_allocated > 0) %>% 
+    mutate(vax_allocated = round(vax_allocated, 0))
+  
+  # add back municipality names and region names to the data
   allocation <- allocation |> 
-    left_join(vax_network_codes |> dplyr::select(mun_name, mun_code), by='mun_code')
+    left_join(vax_network_codes |> dplyr::select(mun_name, mun_code, region_name), by='mun_code')
+  
+  # add back warehouse names to the data
+  allocation2 <- allocation %>% 
+    left_join(connections %>% distinct(Almacen, warehouse_code), by='warehouse_code')
+  
+  allocation2 <- allocation2 %>%
+    left_join(salmi_inventory2 %>% filter(category=='vaccine') %>% distinct(batch_num, Suministro), by= ("batch_num"))
+  
+  
 }

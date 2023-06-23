@@ -92,7 +92,7 @@ for(i in 1:length(unique(adults_inventory_data$warehouse_code))) {
   filtered_data <- adults_inventory_data %>%
     dplyr::filter(warehouse_code == this_code)
   
-  filtered_data$batch_num <- filtered_data$`Nº de Lote`
+
   filtered_data$key <- paste0("w", filtered_data$warehouse_code, "_",
                               filtered_data$batch_num)
   
@@ -170,7 +170,7 @@ master_key_adult <- master_key_adult |>
 
 # save Master_key_adults file ---------------------------------------------
 
-saveRDS(master_key_adult, "Honduras_VAT/data/master_key_adult.rds")
+saveRDS(master_key_adult, "appdata/master_key_adult.rds")
 
 # given the time for allocation (30 days); calculate the maximum doses that can be administered given 
 # historical avg daily vaccination rate
@@ -232,7 +232,7 @@ for(i in 1:nrow(mun_mat)){
   
 }
 
-saveRDS(mun_list, "Honduras_VAT/data/mun_list.rds")
+saveRDS(mun_list, "appdata/mun_list.rds")
 
 # 4. warehouse-batch by municipality matrix for doses constraint
 #### used to calculate total vaccines allocated across all municipalities for each batch
@@ -251,7 +251,7 @@ for (i in 1:length(batch_codes)) {
   batch_list[[i]] <- unlist(batch_fil$row.code) |> as.numeric()
 }
 
-saveRDS(batch_list, "Honduras_VAT/data/batch_list.rds")
+saveRDS(batch_list, "appdata/batch_list.rds")
 
 # directions for lp model -------------------------------------------------
 f.dir.pop = rep('<=', length(mun_list))
@@ -306,7 +306,7 @@ solve(lp)
 
 # check results -----------------------------------------------------------
 
-saveRDS(warehouse_codes, "data/warehouse_codes.rds")
+saveRDS(warehouse_codes, "appdata/warehouse_codes.rds")
 
 master_key_adult <- master_key_adult |> left_join(warehouse_codes, by= 'warehouse_code')
 

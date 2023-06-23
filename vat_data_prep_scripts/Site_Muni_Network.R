@@ -9,7 +9,7 @@ joined_site <- read_rds("data/joined_sites.rds")
 key_base <- read_rds("data/full_info.rds")
 warehouse_codes <- read_rds("data/warehouse_codes.rds")
 
-key_base_2 <- salmi_inventory2 %>%
+key_base_2 <- salmi_vax_inventory %>%
   dplyr::select(Almacen, Dep) %>%
   distinct()
 

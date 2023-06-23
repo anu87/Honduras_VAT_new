@@ -1,9 +1,9 @@
 
 #  download population data and aggregate it to municipality level to calculate eligible populations for vaccines
-devtools::install_github('wpgp/wopr')
-library(wopr)
+# devtools::install_github('wpgp/wopr')
+# library(wopr)
 library(terra)
-library(wpgpDownloadR)
+# library(wpgpDownloadR)
 
 # 
 # # Retrieve the WOPR data catalogue
