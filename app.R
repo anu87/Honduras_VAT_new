@@ -239,7 +239,7 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                p(i18n$t("The below map shows the allocation of vaccines from the distribution centers to the vaccination sites.")),
                                status = "warning", solidHeader = TRUE, collapsible = FALSE,
                                #leafletOutput("prop_dist", height = 600),
-                               DTOutput("prop_dist_dt", height = 600),
+                               DTOutput("child_prop_dist_dt", height = 600),
                                downloadButton("child_vax_allocation_download", label = i18n$t("Download"))
                            )
                            # ,
@@ -506,7 +506,7 @@ server <- function(input, output) {
   
   # display the model finished message-------
   
-  child_proposed_distribution <- reactiveValues(dt = DT::datatable(child_salmi_data))
+  child_proposed_distribution <- reactiveValues(dt = DT::datatable(salmi_data))
   
   observeEvent(input$child_run_model, {
     toggle('child_run_model_message')

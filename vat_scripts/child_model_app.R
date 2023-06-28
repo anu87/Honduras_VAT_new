@@ -114,8 +114,11 @@ child.vat.model <- function(days_allocated = days_allocated_value){
     mutate(vax_allocated = round(vax_allocated, 0))
   
   # add back municipality names and region names to the data
+  
+  clean_codes <- vax_network_codes |> dplyr::select(mun_name, mun_code, region_name) %>% distinct()
+  
   allocation <- allocation |> 
-    left_join(vax_network_codes |> dplyr::select(mun_name, mun_code, region_name), by='mun_code')
+    left_join(clean_codes, by='mun_code')
   
   # add back warehouse names to the data
   allocation2 <- allocation %>% 
@@ -126,3 +129,4 @@ child.vat.model <- function(days_allocated = days_allocated_value){
   
   
 }
+

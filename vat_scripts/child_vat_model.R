@@ -86,8 +86,7 @@ full_info <- read_rds("data/full_info.rds")
 
 #Make child data key
 child_inventory_data <- salmi_inventory3 %>%
-  dplyr::filter(grepl("peds", vax_type)) %>%
-  dplyr::rename(batch_num = `Nº de Lote`)
+  dplyr::filter(grepl("peds", vax_type)) 
 
 for(i in 1:length(unique(child_inventory_data$warehouse_code))) {
   this_code <- unique(child_inventory_data$warehouse_code)[i]

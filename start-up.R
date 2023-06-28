@@ -30,5 +30,5 @@ mun.doses <- readRDS("data/mun_doses_needed.rds")
 
 mun_avg_vax_rate <- readRDS('data/mun_avg_vax_rate.rds')
 
-salmi_inventory2 <- readRDS('data/salmi_inventory2.rds')
+salmi_inventory2 <- readRDS('appdata/salmi_inventory2.rds')
 
