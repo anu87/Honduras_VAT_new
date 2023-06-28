@@ -2,7 +2,7 @@
 # start-up script
 
 pkgs <- c("sf", "dplyr", "zoo", "stringr", "geosphere", "leaflet", "RColorBrewer", "readxl", "DT", 
-          "tidyverse", "clock", "raster", "terra", "wopr", "exactextractr", "stringi", "lpSolveAPI", "lpSolve")
+          "tidyverse", "clock", "raster", "terra", "exactextractr", "stringi", "lpSolveAPI", "lpSolve")
 
 lapply(pkgs, library, character.only = TRUE)
 

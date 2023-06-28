@@ -59,6 +59,7 @@ connections2 <- readRDS("appdata/connections.rds")
 
 # source model function ---------------------------------------------------
 source("vat_scripts/model_app.R")
+source("vat_scripts/child_model_app.R")
 
 # ui ----------------------------------------------------------------------
 
@@ -157,7 +158,7 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                 ),
                 
                 #Proposed Distribution Page -------------
-                tabPanel(title = i18n$t("Proposed Distribution"),
+                tabPanel(title = i18n$t("Proposed Distribution -- Adults"),
                          fluidPage(
                            fluidRow(
                              h1(strong(i18n$t("Construct the Optimization Model")), align = "center")),
@@ -192,6 +193,54 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                #leafletOutput("prop_dist", height = 600),
                                DTOutput("prop_dist_dt", height = 600),
                                downloadButton("vax_allocation_download", label = i18n$t("Download"))
+                           )
+                           # ,
+                           # box(
+                           #   title = i18n$t("Proposed Allocation with District Filter"), width = 12,
+                           #   h5(i18n$t("If you would like to look at one district at a time, use the filter below.")),
+                           #   selectInput("district_selection", i18n$t("Select the District:"), c("Placeholders", "List", "For", "Now")),
+                           #   status = "warning", solidHeader = TRUE, collapsible = FALSE,
+                           #   leafletOutput("prop_dist_filt", height = 600)
+                           # )
+                         )
+                ),
+                
+                #Child Vax Distribution Page -------------
+                tabPanel(title = i18n$t("Proposed Distribution -- Children"),
+                         fluidPage(
+                           fluidRow(
+                             h1(strong(i18n$t("Construct the Optimization Model")), align = "center")),
+                           br(), br(),
+                           fluidRow(
+                             column(6,
+                                    p(strong(i18n$t("Allocation Duration"), style="font-size:25px; font-weight:bold")),
+                                    p(i18n$t("How many days of vaccine supply do you want to allocate? E.g. the next 30 days or the next 60 days")),
+                                    numericInput("child_days_allocated_input", i18n$t("Number of Days:"), value = 30, min = 1, max = 365)
+                             ),
+                             
+                             column(6,
+                                    p(strong(i18n$t("Run Model and View Proposed Distribution"), style="font-size:25px; font-weight:bold")), 
+                                    p(i18n$t("Please press the button below to run the vaccine allocation model.")),
+                                    p(i18n$t("The model may take a few minutes to run. The maps will display once the model is done running.")),
+                                    actionButton("child_run_model", i18n$t("Run Model")),
+                                    tags$br(), tags$br(),
+                                    hidden(
+                                      div(id='child_run_model_message', verbatimTextOutput("child_run_model_text")))
+                             )
+                           ),
+                           tags$br(), tags$br(),
+                           box(width = 12,
+                               leafletOutput("child_dist_map", height = 500)
+                           ),
+                           tags$br(), tags$br(),
+                           
+                           box(width = 12,
+                               p(strong(i18n$t("Vaccine Allocation proposed by the model"), style = "font-size:25px;font-weight:bold")), 
+                               p(i18n$t("The below map shows the allocation of vaccines from the distribution centers to the vaccination sites.")),
+                               status = "warning", solidHeader = TRUE, collapsible = FALSE,
+                               #leafletOutput("prop_dist", height = 600),
+                               DTOutput("prop_dist_dt", height = 600),
+                               downloadButton("child_vax_allocation_download", label = i18n$t("Download"))
                            )
                            # ,
                            # box(
@@ -430,6 +479,95 @@ server <- function(input, output) {
                     vax_admin_const, eligible_atleast_1dose,vax_allocated) %>% 
       rename(Municipality = mun_name, vax_doses_allocated = vax_allocated)
   })
+  
+  
+  
+  #### Child Vax Model Logic #####
+  # VAT model ---------------------------------------------------------------
+  # save days allocated
+  child_days_allocated_value <- eventReactive(input$child_run_model, {
+    child_days_allocated_value <- input$child_days_allocated_input
+  })
+  
+  # run the model
+  child_allocation <- eventReactive(input$child_run_model, {
+    # source the model script
+    child_days_allocated_value <- child_days_allocated_value()
+    child_allocation <- child.vat.model(days_allocated = child_days_allocated_value)
+    
+    child_allocation <- child_allocation %>% 
+      relocate(mun_name, .after = mun_code) %>% 
+      relocate(region_name, .after = mun_name) %>% 
+      relocate(Almacen, .after = region_name) %>% 
+      relocate(Suministro, .after = Almacen)
+  })
+  
+  
+  
+  # display the model finished message-------
+  
+  child_proposed_distribution <- reactiveValues(dt = DT::datatable(child_salmi_data))
+  
+  observeEvent(input$child_run_model, {
+    toggle('child_run_model_message')
+    
+    child_numdays <- input$child_days_allocated_input
+    
+    #proposed_distribution$dt <- proposed_dist
+    
+    output$child_run_model_text <- renderText({
+      i18n$t("The model has finished generating outputs. You can view the model outputs below and download them.")
+    })
+  })
+  
+  # model map-----
+  output$child_dist_map <-  renderLeaflet({
+    
+    flows2 <- gcIntermediate(connections2[,c("lat1", "lon1")], 
+                             connections2[,c("lat2", "lon2")],
+                             sp = T,
+                             addStartEnd = T)
+    
+    
+    flows2$origins <- connections2$mun_name
+    flows2$destinations <- connections2$Almacen
+    
+    
+    hover <- paste0(flows2$origins, " a ", 
+                    flows2$destinations, ': ')
+    
+    pal <- colorFactor(brewer.pal(4, "Set2"), flows2$origins)
+    
+    origin_almacen <-  connections2 |> 
+      dplyr::select(Almacen, lon2, lat2) |> 
+      st_as_sf(coords = c("lat2", "lon2"))
+    
+    dest_mun <-  connections2 |> 
+      dplyr::select(mun_name, lon1, lat1) |> 
+      st_as_sf(coords = c("lat1", "lon1"))
+    
+    leaflet() %>%
+      addProviderTiles("OpenStreetMap") %>%
+      addPolylines(data = flows2, 
+                   # label = hover,
+                   group = ~origins, color = ~pal(origins)) %>%
+      addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(Almacen)) |>
+      addCircleMarkers(data = dest_mun, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
+      addLayersControl(overlayGroups = unique(flows2$origins),
+                       options = layersControlOptions(collapsed = T))
+    
+  })
+  
+  # display the allocation table -------
+  
+  output$child_prop_dist_dt <- DT::renderDT({
+    child_allocation() |> 
+      dplyr::select(mun_code, mun_name, region_name, Almacen, Suministro, batch_num, avg, 
+                    vax_admin_const, eligible_atleast_1dose,vax_allocated) %>% 
+      rename(Municipality = mun_name, vax_doses_allocated = vax_allocated)
+  })
+  
+  
   
   #Render historic data map-----------
   output$historic_data_tmap <- renderLeaflet({
