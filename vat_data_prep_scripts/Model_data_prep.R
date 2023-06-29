@@ -29,6 +29,8 @@ vax_network_codes <- vax_network_codes |>
     .default = mun_code
   ))
 
+
+
 saveRDS(vax_network_codes, 'data/site_mun_dep_codes.rds')
 
 # create Mun vax file from site

@@ -7,7 +7,16 @@ child.vat.model <- function(days_allocated = days_allocated_value){
   master_key_child <- readRDS("appdata/master_key_child.rds")
   batch_list <- readRDS("appdata/batch_list_child.rds")
   mun_list <- readRDS("appdata/mun_list_child.rds")
-  warehouse_codes <- readRDS("appdata/warehouse_codes_child.rds")
+  warehouse_codes <- readRDS("appdata/warehouse_codes_revised.rds")
+  
+  # #For some reason warehouse codes are not mapping properly --> manual fix for now
+  # warehouse_codes$warehouse_code[warehouse_codes$Dep == "Lempira"] <- "O"
+  # warehouse_codes$warehouse_code[warehouse_codes$Dep == "Metropolitana de San Pedro Sula"] <- "N"
+  # warehouse_codes$warehouse_code[warehouse_codes$Dep == "Distrito Central"] <- "M"
+  # warehouse_codes <- warehouse_codes %>% arrange(warehouse_code)
+  # saveRDS(warehouse_codes,"appdata/warehouse_codes_revised.rds")
+  #Lempira -- 0; SPS -- N; DC -- M --> need to fix
+  
   vax_network_codes <- readRDS('appdata/site_mun_dep_codes.rds')
   connections <- readRDS("appdata/connections.rds")
   salmi_app_data <- readRDS("appdata/salmi_app_data.rds")

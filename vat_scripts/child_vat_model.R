@@ -1,7 +1,7 @@
 
 source("start-up.R")
 
-         # datasets to create------
+# datasets to create------
 # add average vax data to mun file; anywhere daily average is < 1, make it 5 (mean) - so that they atleast get some vaccines
 
 
@@ -57,10 +57,12 @@ key_base_2 <- salmi_inventory2 %>%
   dplyr::select(Dep)
 
 #If they ever add more than 26 warehouses then figure out a better way to do this but until then no thank you
-warehouse_codes <- key_base_2 %>%
-  dplyr::select(Dep) %>%
-  distinct()
-warehouse_codes$warehouse_code <-LETTERS[1:nrow(warehouse_codes)]
+# warehouse_codes <- key_base_2 %>%
+#   dplyr::select(Dep) %>%
+#   distinct()
+# warehouse_codes$warehouse_code <-LETTERS[1:nrow(warehouse_codes)]
+warehouse_codes <- read_rds("appdata/warehouse_codes_revised.rds")
+
 
 salmi_inventory3 <- left_join(salmi_inventory2, warehouse_codes, by = c("Dep")) %>%
   dplyr::filter(category == "vaccine")
@@ -99,7 +101,7 @@ for(i in 1:length(unique(child_inventory_data$warehouse_code))) {
                               filtered_data$batch_num)
   
   add_rows <- filtered_data %>%
-    dplyr::select(key, warehouse_code, batch_num, time_to_exp, Cantidad )
+    dplyr::select(key, warehouse_code, batch_num, time_to_exp, Cantidad)
   
   if(i == 1) {
     new_df <- add_rows

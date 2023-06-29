@@ -1,0 +1,13 @@
+name: Honduras_VAT_test
+title:
+username:
+account: palladiumgroup
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 9315329
+bundleId: 7402762
+url: https://palladiumgroup.shinyapps.io/Honduras_VAT_test/
+when: 1688057777.76591
+lastSyncTime: 1688057777.76592
+asMultiple: FALSE
+asStatic: FALSE

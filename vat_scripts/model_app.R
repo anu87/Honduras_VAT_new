@@ -7,7 +7,7 @@ vat.model <- function(days_allocated = days_allocated_value){
   master_key_adult <- readRDS("appdata/master_key_adult.rds")
   batch_list <- readRDS("appdata/batch_list.rds")
   mun_list <- readRDS("appdata/mun_list.rds")
-  warehouse_codes <- readRDS("appdata/warehouse_codes.rds")
+  warehouse_codes <- readRDS("appdata/warehouse_codes_revised.rds") #Flag that this is manual
   vax_network_codes <- readRDS('appdata/site_mun_dep_codes.rds')
   connections <- readRDS("appdata/connections.rds")
   salmi_app_data <- readRDS("appdata/salmi_app_data.rds")
@@ -115,8 +115,10 @@ vat.model <- function(days_allocated = days_allocated_value){
     mutate(vax_allocated = round(vax_allocated, 0))
   
   # add back municipality names and region names to the data
+  clean_codes <- vax_network_codes |> dplyr::select(mun_name, mun_code, region_name) %>% distinct()
+  
   allocation <- allocation |> 
-    left_join(vax_network_codes |> dplyr::select(mun_name, mun_code, region_name), by='mun_code')
+    left_join(clean_codes, by='mun_code')
   
   # add back warehouse names to the data
   allocation2 <- allocation %>% 
