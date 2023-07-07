@@ -17,6 +17,7 @@ library(tibble)
 library(MASS)
 library(readr)
 library(stringr)
+library(writexl)
 #setwd("~/Honduras_VAT/Honduras_VAT")
 
 
@@ -197,9 +198,10 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                p(i18n$t("The below map shows the allocation of vaccines from the distribution centers to the vaccination sites.")),
                                status = "warning", solidHeader = TRUE, collapsible = FALSE,
                                #leafletOutput("prop_dist", height = 600),
-                               DTOutput("prop_dist_dt", height = 600),
-                               downloadButton("vax_allocation_download", label = i18n$t("Download"))
-                           )
+                               DTOutput("prop_dist_dt")
+                           ),
+                           box(width = 12,
+                               downloadButton("vax_allocation_download", label = i18n$t("Download")))
                            # ,
                            # box(
                            #   title = i18n$t("Proposed Allocation with District Filter"), width = 12,
@@ -245,7 +247,7 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                p(i18n$t("The below map shows the allocation of vaccines from the distribution centers to the vaccination sites.")),
                                status = "warning", solidHeader = TRUE, collapsible = FALSE,
                                #leafletOutput("prop_dist", height = 600),
-                               DTOutput("child_prop_dist_dt", height = 600),
+                               DTOutput("child_prop_dist_dt"),
                                downloadButton("child_vax_allocation_download", label = i18n$t("Download"))
                            )
                            # ,
@@ -286,7 +288,22 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                 
                 #Model Documentation Page 
                 tabPanel(title = i18n$t("Model Documentation"),
-                )
+                         tags$h2(i18n$t("This page contains documentation of the methodology used in the vaccine allocation process.")),
+                         tags$br(),
+                         tags$h4(i18n$t("The model currently uses the following constraints to allocate vaccines. The constraints on the allocation models for child and adult doses are identical:")),
+                         tags$br(),
+                         tags$ol(
+                           tags$li(i18n$t("Eligible population served by vaccination site: a vaccination site cannot be given more vaccines than the number of people (either adults or children for the respective models) living in its catchment area who have not been vaccinated.")),
+                           tags$br(),
+                           tags$li(i18n$t("Vaccine administration capacity: a vaccination site cannot receive more vaccines than it can administer, which is calculated by multiplying the days until expiration by the average vaccination capacity per day. Average vaccination capacity per day was calculated using historical vaccination data for each site.")),
+                           tags$ul(
+                             tags$li(i18n$t("Eligible population for each site was calculated using high resolution modeled population data from WorldPop in conjunction with SALMI-provided historical vaccination data. In order to ensure the optimization algorithm is able to calculate a solution for most time windows and in order to better reflect reality, sites with a minimum eligible population below a certain threshold had their minimum eligible populations increased."))
+                           ),
+                           tags$br(),
+                           tags$li(i18n$t("Batch size: the amount of vaccines distributed must be less than the number of vaccines available in each batch.")),
+                           tags$br(),
+                           tags$li(i18n$t("Vaccine allocation should be distributed evenly across vaccination sites: all vaccination sites should receive vaccines for at least a certain percentage of the population they serve."))
+                ))
                 ))
 
 # Define server logic required to draw a histogram
@@ -419,7 +436,7 @@ server <- function(input, output) {
       relocate(region_name, .after = mun_name) %>% 
       relocate(Almacen, .after = region_name) %>% 
       relocate(Suministro, .after = Almacen)
-    saveRDS(allocation, "data/allocation.rds")
+    #saveRDS(allocation, "data/allocation.rds")
     allocation
   })
   
@@ -518,6 +535,15 @@ server <- function(input, output) {
   })
   
   
+  output$vax_allocation_download <- downloadHandler(
+    filename = function() {
+      paste('Adults_Vax-', Sys.Date(), '.xlsx', sep='')
+    },
+    content = function(file) {
+      writexl::write_xlsx(allocation(), file)
+    }
+  )
+  
   
   #### Child Vax Model Logic #####
   # VAT model ---------------------------------------------------------------
@@ -538,7 +564,7 @@ server <- function(input, output) {
       relocate(Almacen, .after = region_name) %>% 
       relocate(Suministro, .after = Almacen)
     
-    saveRDS(child_allocation, "data/child_allocation.rds")
+    #saveRDS(child_allocation, "data/child_allocation.rds")
     child_allocation
   })
   
@@ -636,6 +662,14 @@ server <- function(input, output) {
       rename(Municipality = mun_name, vax_doses_allocated = vax_allocated)
   })
   
+  output$child_vax_allocation_download <- downloadHandler(
+    filename = function() {
+      paste('Peds_Vax-', Sys.Date(), '.xlsx', sep='')
+    },
+    content = function(file) {
+      writexl::write_xlsx(child_allocation(), file)
+    }
+  )
   
   
   #Render historic data map-----------
