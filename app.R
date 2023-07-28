@@ -58,7 +58,10 @@ salmi_data <- readxl::read_xlsx("appdata/SALMI HON Inventario Biologicos_2022-01
 salmi_data <- salmi_data[,1:7]
 colnames(salmi_data) <- salmi_data[3,]
 salmi_data <- salmi_data[-c(1:3),]
-connections2 <- readRDS("appdata/connections.rds")
+connections2 <- readRDS("appdata/connections.rds") #IK FLAG TO FIX --> JOIN GETTING MESSED UP 
+
+net_to_munis <- read_rds("appdata/full_net_leaflet.rds")
+
 
 adm2 <- read_rds("appdata/Adm2_w_Pops.rds")
 #adm2 <- st_simplify(adm2, dTolerance = 100) #Improve runtime
@@ -158,6 +161,12 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                  leafletOutput("full_network", height = 600)),
                              box(width = 6,
                                  status = "warning", solidHeader = TRUE, collapsible = FALSE,
+                                 p(i18n$t("Regional Warehouses to Municipalities"), style="text-align:center;font-weight:bold"),
+                                 leafletOutput("full_network_to_munis", height = 600)
+                             )),
+                           fluidRow(
+                             box(width = 12,
+                                 status = "warning", solidHeader = T, collapsible = F,
                                  p(i18n$t("Vaccination Sites"),style="text-align:center;font-weight:bold"),
                                  leafletOutput("vax_sites", height = 600)
                              ))
@@ -364,6 +373,10 @@ server <- function(input, output) {
     
   })
   
+  output$full_network_to_munis <- renderLeaflet({
+    net_to_munis
+  })
+  
   #Vax sites------
   output$vax_sites <- renderLeaflet({
     
@@ -504,6 +517,9 @@ server <- function(input, output) {
         dplyr::select(mun_name, lon1, lat1) |> 
         st_as_sf(coords = c("lat1", "lon1"))
       
+      #Remove central to muni --> FLAG TEMP SOLUTION TILL MODEL FIXED
+      flows2 <- flows2[flows2$Origin != "ALMACEN NACIONAL",]
+      
       leaflet() %>%
         addProviderTiles("OpenStreetMap") %>%
         addPolylines(data = flows2, 
@@ -631,6 +647,9 @@ server <- function(input, output) {
       dest_mun <-  connections2 |> 
         dplyr::select(mun_name, lon1, lat1) |> 
         st_as_sf(coords = c("lat1", "lon1"))
+      
+      #Remove central to muni --> FLAG TEMP SOLUTION TILL MODEL FIXED
+      flows2 <- flows2[flows2$Origin != "ALMACEN NACIONAL",]
       
       leaflet() %>%
         addProviderTiles("OpenStreetMap") %>%

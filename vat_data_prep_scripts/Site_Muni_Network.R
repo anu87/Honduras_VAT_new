@@ -9,7 +9,7 @@ joined_site <- read_rds("data/joined_sites.rds")
 key_base <- read_rds("data/full_info.rds")
 warehouse_codes <- read_rds("data/warehouse_codes.rds")
 
-key_base_2 <- salmi_vax_inventory %>%
+key_base_2 <- salmi_vax_inventory %>% #I think this is salmi_inventory2
   dplyr::select(Almacen, Dep) %>%
   distinct()
 
@@ -17,8 +17,12 @@ key_base_2$is_externo <- ifelse(grepl("EXT", key_base_2$Almacen), T, F)
 key_base_2 <- key_base_2 %>%
   dplyr::filter(!is_externo)
 
-#Same as last time for consistent codes -- i double checked
+#Same as last time for consistent codes --> manually fix a few
 key_base_2$warehouse_code <-LETTERS[1:nrow(key_base_2)]
+key_base_2$warehouse_code[13] <- "O"
+key_base_2$warehouse_code[14] <- "M"
+key_base_2$warehouse_code[15] <- "N"
+
 key_base_2<- key_base_2 %>%
   dplyr::select(Almacen, warehouse_code)
 
@@ -59,7 +63,7 @@ key_base_joined$wh_join_name <- dplyr::case_when(key_base_joined$Almacen == "ALM
                                                  key_base_joined$Almacen == "ALM REGIONAL DE BIOLOGICOS ISLAS DE LA BAHIA" ~ "RS Islas de la Bahía" ,
                                                  key_base_joined$Almacen == "ALM REGIONAL DE BIOLOGICOS LA PAZ" ~ "RS La Paz",
                                                  key_base_joined$Almacen == "ALM REGIONAL DE BIOLOGICOS LEMPIRA" ~ "RS Lempira",
-                                                 key_base_joined$Almacen == "ALM REGIONAL DE BIOLOGICOS OLANCHO" ~ "RS Ocotepeque",
+                                                 key_base_joined$Almacen == "ALM REGIONAL DE BIOLOGICOS OLANCHO" ~ "RS Olancho",
                                                  key_base_joined$Almacen == "ALM REGIONAL DE BIOLOGICOS SANTA BARBARA" ~ "RS Santa Bárbara",
                                                  key_base_joined$Almacen == "ALM REGIONAL DE BIOLOGICOS VALLE"  ~ "RS Valle",
                                                  key_base_joined$Almacen == "ALM REGIONAL DE BIOLOGICOS YORO"  ~ "RS  Yoro",
@@ -76,6 +80,7 @@ warehouse_coords_distinct <- st_drop_geometry(warehouse_coords_distinct)
 
 connections <-left_join(key_base_joined, warehouse_coords_distinct, by = c("wh_join_name" = "Warehouse name"))
 saveRDS(connections, "data/connections.rds")
+saveRDS(connections, "appdata/connections.rds")
 #Need connections file with every muni centroid (lat1, lon1) and 
 #the corresponding warehouse location (lat2, lon2)
 
@@ -83,7 +88,10 @@ connections <- connections |> rename(lat12 = lon1, lon1 = lat1)
 
 connections <- connections |> rename(lat1 = lat12)
 
-flows <- gcIntermediate(connections[,c("lat1", "lon1")], 
+connections <- connections %>%
+  filter(warehouse_code != "A")
+
+flows <- gcIntermediate(connections[,c("lon1", "lat1")], 
                         connections[,c("lat2", "lon2")],
                         sp = T,
                         addStartEnd = T)
@@ -104,9 +112,9 @@ origin_wh <-  connections |>
 
 dest_wh <-  connections |> 
   dplyr::select(mun_name, lon1, lat1) |> 
-  st_as_sf(coords = c("lat1", "lon1"))
+  st_as_sf(coords = c("lon1", "lat1"))
 
-leaflet() %>%
+out_leaf <- leaflet() %>%
   addProviderTiles("OpenStreetMap") %>%
   addPolylines(data = flows, 
                # label = hover,
@@ -115,3 +123,5 @@ leaflet() %>%
   addCircleMarkers(data = dest_wh, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
   addLayersControl(overlayGroups = unique(flows$origins),
                    options = layersControlOptions(collapsed = T))
+
+saveRDS(out_leaf, "appdata/full_net_leaflet.rds")
