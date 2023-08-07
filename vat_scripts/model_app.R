@@ -1,7 +1,8 @@
 
 
 
-vat.model <- function(days_allocated = days_allocated_value){
+vat.model <- function(days_allocated = days_allocated_value,
+                      salmi_inventory2){
   
   # source("~/Honduras_VAT/start-up.R")
   master_key_adult <- readRDS("appdata/master_key_adult.rds")
@@ -10,9 +11,13 @@ vat.model <- function(days_allocated = days_allocated_value){
   warehouse_codes <- readRDS("appdata/warehouse_codes_revised.rds") #Flag that this is manual
   vax_network_codes <- readRDS('appdata/site_mun_dep_codes.rds')
   connections <- readRDS("appdata/connections.rds")
-  salmi_app_data <- readRDS("appdata/salmi_app_data.rds")
+  #salmi_app_data <- readRDS("appdata/salmi_app_data.rds")
+  #salmi_inventory2 <- readRDS("appdata/salmi_inventory2.rds")
   
-  salmi_inventory2 <- readRDS("appdata/salmi_inventory2.rds")
+  app_dat_names <- c("Almacen", "Código", "Suministro", "U. de Emisión", "Nº de Lote", 
+                     "Fecha Vto", "Cantidad")
+  salmi_app_data <- salmi_inventory2 %>%
+    dplyr::select(!!!app_dat_names)
   
   master_key_adult$vax_admin_const <- round(master_key_adult$avg*days_allocated, 0)
   
@@ -113,8 +118,8 @@ vat.model <- function(days_allocated = days_allocated_value){
   allocation <- allocation %>% 
     filter(vax_allocated > 0) %>% 
     mutate(vax_allocated = round(vax_allocated, 0))
-  
-  # add back municipality names and region names to the data
+
+    # add back municipality names and region names to the data
   clean_codes <- vax_network_codes |> dplyr::select(mun_name, mun_code, region_name) %>% distinct()
   
   allocation <- allocation |> 

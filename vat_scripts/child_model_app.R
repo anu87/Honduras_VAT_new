@@ -1,7 +1,8 @@
 
 
 
-child.vat.model <- function(days_allocated = days_allocated_value){
+child.vat.model <- function(days_allocated = days_allocated_value,
+                            salmi_inventory2){
   
   # source("~/Honduras_VAT/start-up.R")
   master_key_child <- readRDS("appdata/master_key_child.rds")
@@ -21,7 +22,7 @@ child.vat.model <- function(days_allocated = days_allocated_value){
   connections <- readRDS("appdata/connections.rds")
   salmi_app_data <- readRDS("appdata/salmi_app_data.rds")
   
-  salmi_inventory2 <- readRDS("appdata/salmi_inventory2.rds")
+  #salmi_inventory2 <- readRDS("appdata/salmi_inventory2.rds")
   
   master_key_child$vax_admin_const <- round(master_key_child$avg*days_allocated, 0)
   
@@ -138,4 +139,5 @@ child.vat.model <- function(days_allocated = days_allocated_value){
   
   
 }
+
 
