@@ -26,6 +26,15 @@ child.vat.model <- function(days_allocated = days_allocated_value,
   
   master_key_child$vax_admin_const <- round(master_key_child$avg*days_allocated, 0)
   
+  # fix too low eligible cases ----------------------------------------------
+  # cases when the `eligible_atleast_1dose` is < vax_admin_const; change vax_admin_const = eligible_atleast_1dose
+  
+  master_key_child <- master_key_child %>% 
+    mutate(vax_admin_const = case_when(
+      vax_admin_const > eligible_atleast_1dose ~ eligible_atleast_1dose,
+      .default = vax_admin_const
+    ))
+  
   # given the time for allocation (30 days); calculate the maximum doses that can be administered given 
   # historical avg daily vaccination rate
   

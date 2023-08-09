@@ -133,10 +133,10 @@ mun.doses <- mun.doses |>
   )) %>% 
   rowwise() |> 
   mutate(eligible_4doses = (world_pop-`1ra`)*4, #people who have received 0 doses can get 4 doses in the future
-         eligible_3doses = (`1ra` - `2da`)*3,
-         eligible_2doses = (`2da`-`1R`)*2,
-         eligible_1dose = (`1R`-`2R`),
-         eligible_atleast_1dose = world_pop-`2R`)
+         eligible_3doses = (`1ra` - `2da`)*3,  # people who have received 1 dose and can get 3 more
+         eligible_2doses = (`2da`-`1R`)*2, # people who have received 2 doses and can get 2 more
+         eligible_1dose = (`1R`-`2R`), # people who have received 3 doses and can get 1 more
+         eligible_atleast_1dose = world_pop-`2R`) #no. of people who can get 1 or more doses
 
 
 # just use - eligible_atleast_1dose for now - others have too many negative numbers. Verify later with country team

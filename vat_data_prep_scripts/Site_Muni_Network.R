@@ -9,7 +9,7 @@ joined_site <- read_rds("data/joined_sites.rds")
 key_base <- read_rds("data/full_info.rds")
 warehouse_codes <- read_rds("data/warehouse_codes.rds")
 
-key_base_2 <- salmi_vax_inventory %>% #I think this is salmi_inventory2
+key_base_2 <- salmi_inventory2 %>% #I think this is salmi_inventory2
   dplyr::select(Almacen, Dep) %>%
   distinct()
 
@@ -81,12 +81,12 @@ warehouse_coords_distinct <- st_drop_geometry(warehouse_coords_distinct)
 connections <-left_join(key_base_joined, warehouse_coords_distinct, by = c("wh_join_name" = "Warehouse name"))
 saveRDS(connections, "data/connections.rds")
 saveRDS(connections, "appdata/connections.rds")
-#Need connections file with every muni centroid (lat1, lon1) and 
-#the corresponding warehouse location (lat2, lon2)
-
-connections <- connections |> rename(lat12 = lon1, lon1 = lat1)
-
-connections <- connections |> rename(lat1 = lat12)
+# #Need connections file with every muni centroid (lat1, lon1) and 
+# #the corresponding warehouse location (lat2, lon2)
+# 
+# connections <- connections |> rename(lat12 = lon1, lon1 = lat1)
+# 
+# connections <- connections |> rename(lat1 = lat12)
 
 connections <- connections %>%
   filter(warehouse_code != "A")

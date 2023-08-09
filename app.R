@@ -22,6 +22,7 @@ library(readxl)
 library(writexl)
 library(zoo)
 library(tidyverse)
+library(stringi)
 
 #setwd("~/Honduras_VAT/Honduras_VAT")
 
@@ -714,6 +715,15 @@ server <- function(input, output) {
       # given the time for allocation (30 days); calculate the maximum doses that can be administered given 
       # historical avg daily vaccination rate
       master_key_adult$vax_admin_const <- round(master_key_adult$avg*days_to_allocate, 0)
+      
+      # fix too low eligible cases ----------------------------------------------
+      
+      master_key_adult <- master_key_adult %>% 
+        mutate(vax_admin_const = case_when(
+          vax_admin_const > eligible_atleast_1dose ~ eligible_atleast_1dose,
+          .default = vax_admin_const
+        ))
+      
       
       # lpsolve API -------------------------------------------------------------
       

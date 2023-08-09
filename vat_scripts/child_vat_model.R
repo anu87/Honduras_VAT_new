@@ -154,7 +154,7 @@ child_inventory_data <- child_inventory_data |>
 # data for child vax allocation ------------------------------------------
 
 master_key_child$dose_quantity <- master_key_child$Cantidad*6
-days_to_allocate = 30
+
 
 
 
@@ -171,19 +171,29 @@ master_key_child <- master_key_child |>
   arrange(time_to_exp, .by_group = TRUE) |> 
   ungroup() 
 
-#Fix 0 eligible muni issue --> set min eligible to 300 ***** IK FLAG TEMP SOLUTION POSSIBLY
-master_key_child <- master_key_child %>% 
-  mutate(eligible_atleast_1dose = case_when(eligible_atleast_1dose < 300  ~ 300,
-                                            .default = eligible_atleast_1dose))
 
 
 # save Master_key_child file ---------------------------------------------
 
 saveRDS(master_key_child, "appdata/master_key_child.rds")
 
+days_to_allocate = 30
 # given the time for allocation (30 days); calculate the maximum doses that can be administered given 
 # historical avg daily vaccination rate
 master_key_child$vax_admin_const <- round(master_key_child$avg*days_to_allocate, 0)
+
+
+
+# fix too low eligible cases ----------------------------------------------
+# cases when the `eligible_atleast_1dose` is < vax_admin_const; change vax_admin_const = eligible_atleast_1dose
+
+master_key_child <- master_key_child %>% 
+  mutate(vax_admin_const = case_when(
+    vax_admin_const > eligible_atleast_1dose ~ eligible_atleast_1dose,
+    .default = vax_admin_const
+  ))
+
+
 
 # lpsolve API -------------------------------------------------------------
 
@@ -315,7 +325,7 @@ obj.df <- master_key_child2 |>
   # weight regional warehouse higher than national - so that vax are first allocated from there
   mutate(time_to_exp_rev = case_when(
     startsWith(key, "wA") ~ time_to_exp_rev,
-    .default = time_to_exp_rev+10
+    .default = time_to_exp_rev+50
   ))
   
 set.objfn(lp, obj.df$time_to_exp_rev)
@@ -326,7 +336,7 @@ solve(lp)
 
 # check results -----------------------------------------------------------
 
-saveRDS(warehouse_codes, "appdata/warehouse_codes_child.rds")
+# saveRDS(warehouse_codes, "appdata/warehouse_codes_child.rds")
 
 master_key_child <- master_key_child |> left_join(warehouse_codes, by= 'warehouse_code')
 
