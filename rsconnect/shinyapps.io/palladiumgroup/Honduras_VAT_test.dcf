@@ -5,10 +5,10 @@ account: palladiumgroup
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 9315329
-bundleId: 7506610
+bundleId: 7549336
 url: https://palladiumgroup.shinyapps.io/Honduras_VAT_test/
-when: 1690552374.38133
-lastSyncTime: 1690552374.38135
+when: 1691606944.59323
+lastSyncTime: 1691606944.59323
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: map_workspace.R|README.md|start-up.R|data|Honduras_Docs|vat_data_prep_scripts
+ignoredFiles: allocation_workspace.R|map_workspace.R|README.md|start-up.R|Honduras_Docs|vat_data_prep_scripts

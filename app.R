@@ -17,6 +17,7 @@ library(tibble)
 library(MASS)
 library(readr)
 library(stringr)
+library(stringi)
 library(readxl)
 library(writexl)
 library(zoo)
@@ -802,7 +803,59 @@ server <- function(input, output) {
       relocate(Almacen, .after = region_name) %>% 
       relocate(Suministro, .after = Almacen)
     saveRDS(allocation, "appdata/allocation.rds")
-    allocation
+    
+    
+    connections_key <- connections2 %>% 
+      filter(warehouse_code != "A")
+    
+    #Need to separate out rows from national warehouse
+    regional_allocs <- allocation %>% 
+      dplyr::filter(warehouse_code == "A")
+    
+    #All other ones --> ugly but easier rejoining after manipulation
+    remaining_allocs <- allocation %>%
+      dplyr::filter(warehouse_code != "A")
+    
+    #Match indices of these against the key to then replace warehouse info 
+    index_matches <- match(regional_allocs$mun_code,connections_key$mun_code)
+    
+    #NA ones --> only supplied by national (removed externos from data for now so that's probably why)
+    remaining_allocs <- rbind(remaining_allocs, regional_allocs[which(is.na(index_matches)),])
+    regional_allocs <- regional_allocs[-which(is.na(index_matches)),]
+    
+    index_matches <- match(regional_allocs$mun_code,connections_key$mun_code)
+    
+    #replace almacen, warehouse code, dep
+    regional_allocs$warehouse_code <- connections_key$warehouse_code[index_matches]
+    regional_allocs$Almacen <- connections_key$Almacen[index_matches]
+    regional_allocs$Dep <- connections_key$dep_clean[index_matches]
+    
+    #Rejoin with the allocation table --> replace original rows and then output nat'l to regional as another element in list output?
+    remaining_allocs <- rbind(remaining_allocs, regional_allocs)
+    
+    clean_allocs <- remaining_allocs %>% 
+      dplyr::select(Almacen, mun_name, batch_num, vax_allocated) %>%
+      dplyr::rename(Origin = Almacen, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
+      dplyr::mutate(Distribution = "Final")
+    
+    natl_allocs <- regional_allocs %>%#Need two of these --> 1 for allocs from natl to regional 1 from regional to muni
+      dplyr::select(Almacen, mun_name, batch_num, vax_allocated) %>%
+      dplyr::rename(Origin = Almacen, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
+      dplyr::mutate(Destination = Origin,
+                    Origin = "ALMACEN NACIONAL") %>%
+      dplyr::group_by(Origin, Destination, `Batch Num`) %>%
+      dplyr::summarise(Allocated = sum(Allocated)) %>%
+      ungroup() %>%
+      dplyr::mutate(Distribution = "Intermediate")
+    
+    clean_allocs <- rbind(clean_allocs, natl_allocs) %>%
+      dplyr::arrange(Origin, Destination, `Batch Num`)
+    
+    #Create output list for user --> first one has all final distribution legs, second one has all intermediate, third one is clean for data table --> download all of them?
+    allocation_list <- list(remaining_allocs, natl_allocs, clean_allocs)
+    names(allocation_list) <- c("final", "intermediate", "clean")
+    
+    allocation_list
   })
   
   
@@ -823,9 +876,19 @@ server <- function(input, output) {
     })
   })
   
+  # #Reactive object for natl to regional distribution (allocation() is for warehouse to muni need warehouse to warehouse) 
+  # nat_to_reg_allocation <- reactive({
+  #   allocation <- allocation()
+  #   
+  # })
+  
   # model map-----
   output$dist_map <-  renderLeaflet({
-    allocation <- allocation()
+    allocation_list <- allocation()
+    
+    allocation <- allocation_list$final
+    inter_alloc <- allocation_list$intermediate
+    
     if(isTruthy(allocation)) {
       allocation$key <- paste(allocation$Almacen, allocation$mun_code, sep = "_")
       
@@ -833,13 +896,10 @@ server <- function(input, output) {
       
       allocation_joined <- left_join(allocation, connections2, by = "key") %>% as.tibble()
       
-      
-      
       flows2 <- gcIntermediate(allocation_joined[,c("lat1", "lon1")], 
                                allocation_joined[,c("lat2", "lon2")],
                                sp = T,
                                addStartEnd = T)
-      
       
       flows2$Origin <- allocation_joined$Almacen.x
       flows2$Destination <- allocation_joined$mun_name.x
@@ -870,9 +930,9 @@ server <- function(input, output) {
         st_as_sf(coords = c("lat1", "lon1"))
       
       #Remove central to muni --> FLAG TEMP SOLUTION TILL MODEL FIXED
-      flows2 <- flows2[flows2$Origin != "ALMACEN NACIONAL",]
+      #flows2 <- flows2[flows2$Origin != "ALMACEN NACIONAL",]
       
-      leaflet() %>%
+      out_leaf <- leaflet() %>%
         addProviderTiles("OpenStreetMap") %>%
         addPolylines(data = flows2, 
                      label = label_list,
@@ -890,16 +950,70 @@ server <- function(input, output) {
                     opacity = 1)
     }
     
+    if(isTruthy(inter_alloc)) {
+      #Join warehouse coords --> I'm sorry Hadley Wickham
+      inter_alloc[,c("lon1", "lat1")] <- connections2[match(inter_alloc$Origin,connections2$Almacen),c("lon2", "lat2")]
+      inter_alloc[,c("lon2", "lat2")] <- connections2[match(inter_alloc$Destination,connections2$Almacen),c("lon2", "lat2")]
+      
+      
+      inter_flows <- gcIntermediate(inter_alloc[,c("lat1", "lon1")], 
+                                    inter_alloc[,c("lat2", "lon2")],
+                                    sp = T,
+                                    addStartEnd = T)
+      
+      inter_flows$Origin <- inter_alloc$Origin
+      inter_flows$Destination <- inter_alloc$Destination
+      inter_flows$Batch_Num <- inter_alloc$`Batch Num`
+      inter_flows$Vax_Allocated <- inter_alloc$Allocated
+      
+      inter_label_list <- list()
+      inter_popup_list <- list()
+      for(i in 1:nrow(inter_flows)) {
+        inter_label_list[[i]] <- paste0(str_to_title(inter_flows$Origin[i]), " a ", inter_flows$Destination[i])
+        inter_popup_list[[i]] <- paste(glue::glue("<b>{str_to_title(inter_flows$Origin[i])} a {inter_flows$Destination[i]}</b>"),  
+                                 glue::glue("<i>Número de lote</i>: {inter_flows$Batch_Num[i]}"),
+                                 glue::glue("<i>Vacunas Asignadas</i>: {inter_flows$Vax_Allocated[i]}"),
+                                 sep = "</br>")
+      }
+      
+      
+      inter_origin_almacen <-  inter_alloc |> 
+        dplyr::select(Origin, lon1, lat1) |> 
+        st_as_sf(coords = c("lat1", "lon1"))
+      
+      inter_dest_almacen <-  inter_alloc |> 
+        dplyr::select(Destination, lon2, lat2) |> 
+        st_as_sf(coords = c("lat2", "lon2"))
+      
+      
+      out_leaf <- out_leaf %>%
+        addPolylines(data = inter_flows, 
+                     label = inter_label_list,
+                     popup = inter_popup_list,
+                     group = ~Origin, color = "Grey") %>%
+        addCircleMarkers(data = inter_origin_almacen, radius = 1.5, label = ~as.character(Origin)) |>
+        addCircleMarkers(data = inter_dest_almacen, radius = 0.75, color = 'red', label = ~as.character(Destination)) 
+        # addLayersControl(overlayGroups = unique(inter_flows$Origin),
+        #                  options = layersControlOptions(collapsed = T))
+      
+      
+    }
     
+    
+    out_leaf
   })
   
   # display the allocation table -------
   
   output$prop_dist_dt <- DT::renderDT({
-    allocation() |> 
-      dplyr::select(mun_code, mun_name, region_name, Almacen, Suministro, batch_num, avg, 
-                    vax_admin_const, eligible_atleast_1dose,vax_allocated) %>% 
-      rename(Municipality = mun_name, vax_doses_allocated = vax_allocated)
+    allocation_list <- allocation()
+    
+    allocation_list$clean
+    
+    # allocation() |> 
+    #   dplyr::select(mun_code, mun_name, region_name, Almacen, Suministro, batch_num, avg, 
+    #                 vax_admin_const, eligible_atleast_1dose,vax_allocated) %>% 
+    #   rename(Municipality = mun_name, vax_doses_allocated = vax_allocated)
   })
   
   
