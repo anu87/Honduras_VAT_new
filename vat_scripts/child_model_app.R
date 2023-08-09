@@ -1,5 +1,5 @@
 
-
+# days_allocated = 60
 
 child.vat.model <- function(days_allocated = days_allocated_value,
                             salmi_inventory2){

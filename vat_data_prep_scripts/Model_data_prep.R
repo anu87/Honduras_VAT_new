@@ -31,7 +31,7 @@ vax_network_codes <- vax_network_codes |>
 
 
 
-saveRDS(vax_network_codes, 'data/site_mun_dep_codes.rds')
+# saveRDS(vax_network_codes, 'data/site_mun_dep_codes.rds')
 
 # create Mun vax file from site
 # add mun & dep codes to site hist
@@ -125,7 +125,12 @@ mun.hist.pop <- mun.hist |>
 mun.doses <- mun.hist.pop |> 
   pivot_wider(names_from = Dos, values_from = Num_Doses)
 
-mun.doses <- mun.doses |> 
+
+mun.doses <- mun.doses |>
+  mutate(`2R` = case_when(
+    is.na(`2R`) ~ 0,
+    .default = `2R`
+  )) %>% 
   rowwise() |> 
   mutate(eligible_4doses = (world_pop-`1ra`)*4, #people who have received 0 doses can get 4 doses in the future
          eligible_3doses = (`1ra` - `2da`)*3,

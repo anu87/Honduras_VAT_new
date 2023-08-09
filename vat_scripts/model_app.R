@@ -96,11 +96,12 @@ vat.model <- function(days_allocated = days_allocated_value,
   obj.df <- master_key_adult2 |> 
     distinct(mun_code, key, time_to_exp) |> 
     mutate(time_to_exp = as.numeric(gsub(" days","",time_to_exp)),
+           # reverse time to expiration, to prefer batches with fewer days left -> higher coefficient
            time_to_exp_rev = round(400/time_to_exp, 0)) |>
     # weight regional warehouse higher than national - so that vax are first allocated from there
     mutate(time_to_exp_rev = case_when(
       startsWith(key, "wA") ~ time_to_exp_rev,
-      .default = time_to_exp_rev+10
+      .default = time_to_exp_rev+50
     ))
   
   set.objfn(lp.vat, obj.df$time_to_exp_rev)
