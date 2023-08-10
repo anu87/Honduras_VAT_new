@@ -20,9 +20,13 @@ child.vat.model <- function(days_allocated = days_allocated_value,
   
   vax_network_codes <- readRDS('appdata/site_mun_dep_codes.rds')
   connections <- readRDS("appdata/connections.rds")
-  salmi_app_data <- readRDS("appdata/salmi_app_data.rds")
-  
+  #salmi_app_data <- readRDS("appdata/salmi_app_data.rds")
   #salmi_inventory2 <- readRDS("appdata/salmi_inventory2.rds")
+  
+  app_dat_names <- c("Almacen", "Código", "Suministro", "U. de Emisión", "Nº de Lote", 
+                     "Fecha Vto", "Cantidad")
+  salmi_app_data <- salmi_inventory2 %>%
+    dplyr::select(!!!app_dat_names)
   
   master_key_child$vax_admin_const <- round(master_key_child$avg*days_allocated, 0)
   

@@ -1044,10 +1044,253 @@ server <- function(input, output) {
     child_days_allocated_value <- input$child_days_allocated_input
   })
   
+  
   # run the model
   child_allocation <- eventReactive(input$child_run_model, {
-    # source the model script
+    
+    updated_inventory <- salmi_data_updated$dat 
     child_days_allocated_value <- child_days_allocated_value()
+    #Regenerate the inputs if the warehouse data changed at all --> else use defaults
+    
+    if(isTruthy(updated_inventory)) { #Change to check if warehouse data changed or not
+      
+      child.mun.doses <- mun.doses |> 
+        mutate(region_code = case_when(
+          is.na(region_code) ~ substr(mun_code,1,2),
+          .default = region_code
+        ))
+      
+      child.mun.doses <-child.mun.doses|> 
+        dplyr::group_by(Dep, region_code, mun_name, mun_code, Edad) |> 
+        dplyr::summarise(world_pop = max(world_pop),across(`1R`:eligible_atleast_1dose, ~sum(.x, na.rm = TRUE)), .groups = 'drop')  
+      
+      child.mun.doses <- child.mun.doses |> 
+        left_join(mun_avg_vax_rate |> dplyr::select(-mun_name), by='mun_code')
+     
+      child.mun.doses$avg.daily.rate <- ifelse(child.mun.doses$avg.daily.rate<5, 5, child.mun.doses$avg.daily.rate)
+      
+      child.mun.doses$eligible_atleast_1dose <- ifelse(is.na(child.mun.doses$eligible_atleast_1dose), child.mun.doses$world_pop, 
+                                                       child.mun.doses$eligible_atleast_1dose)
+      
+      child.mun.doses$eligible_atleast_1dose <- ifelse(child.mun.doses$eligible_atleast_1dose<0, child.mun.doses$world_pop, 
+                                                       child.mun.doses$eligible_atleast_1dose)
+      
+      
+      
+      # 1. matrix of mun with warehouses
+      
+      child.mun.doses$Dep2 <- stri_trans_general(gsub("Departamental de |Metropolitana del | Metropolitana de ", "", child.mun.doses$Dep), 'latin-ascii') %>%
+        trimws()
+      
+      
+      #We want file with municipal doses with name of the salmi warehouse next to it 
+      #Just need department, region code, municipal code, municipal name, warehouse name --> remove all the numbers from mun.doses
+      #Create warehouse code and then a region code
+      
+      key_base <- child.mun.doses %>%
+        dplyr::select(Dep2, Dep, region_code, mun_name, mun_code) %>%
+        dplyr::rename(dep_clean = Dep2,
+                      dep_full = Dep)
+      
+      key_base_2 <- updated_inventory %>%
+        dplyr::select(Dep)
+      
+      warehouse_codes <- read_rds("appdata/warehouse_codes_revised.rds")
+      
+      salmi_inventory3 <- left_join(updated_inventory, warehouse_codes, by = c("Dep")) %>%
+        dplyr::filter(category == "vaccine")
+      
+      tmp_joined <- left_join(key_base, key_base_2, by = c("dep_clean" = "Dep")) %>% distinct()
+      info_joined <- left_join(tmp_joined, warehouse_codes, by = c("dep_clean" = "Dep")) %>%
+        dplyr::filter(!is.na(region_code)) #Double check with anubhuti --> Flag to figure out Ocatepeque Choluteca 8/10
+      
+      nat_info <- info_joined %>% 
+        dplyr::select(mun_name, mun_code) %>%
+        dplyr::mutate(dep_clean = "",
+                      dep_full = "",
+                      region_code = "", 
+                      warehouse_code = "A")
+      
+      full_info <- rbind(info_joined, nat_info) %>%
+        dplyr::filter(!is.na(warehouse_code))
+      
+      #Make child data key
+      child_inventory_data <- salmi_inventory3 %>%
+        dplyr::filter(grepl("peds", vax_type)) 
+      
+      for(i in 1:length(unique(child_inventory_data$warehouse_code))) {
+        this_code <- unique(child_inventory_data$warehouse_code)[i]
+        
+        filtered_data <- child_inventory_data %>%
+          dplyr::filter(warehouse_code == this_code)
+        
+        #Might need to add another element for exp date or something
+        filtered_data$key <- paste0("w", filtered_data$warehouse_code, "_",
+                                    filtered_data$batch_num)
+        
+        add_rows <- filtered_data %>%
+          dplyr::select(key, warehouse_code, batch_num, time_to_exp, Cantidad)
+        
+        if(i == 1) {
+          new_df <- add_rows
+        } else {
+          new_df <- rbind(new_df, add_rows)
+        }
+      }
+      
+      #Now add rows for every municipality
+      for(i in 1:nrow(new_df)) {
+        filtered_munis <- full_info %>% 
+          dplyr::filter(warehouse_code == new_df$warehouse_code[i])
+        
+        for(j in 1:nrow(filtered_munis)) {
+          merged_info <- merge(new_df[i,], filtered_munis[j,]) %>%
+            dplyr::select(mun_code, warehouse_code, batch_num, key, Cantidad, time_to_exp)
+          
+          
+          muni_avg <-  child.mun.doses %>% 
+            dplyr::filter(mun_code == merged_info$mun_code, Edad == "Pediátrica") %>% dplyr::select(avg.daily.rate) %>%
+            head(1) %>%
+            unlist() %>%
+            as.numeric()
+          
+          muni_avl <- muni_avg * as.numeric(merged_info$time_to_exp)
+          
+          merged_info$avg <- muni_avg
+          merged_info$avl <- muni_avl
+          
+          if(i == 1 & j == 1) {
+            master_key_child  <- merged_info
+          } else {
+            master_key_child  <- rbind(master_key_child , merged_info)
+          }
+        }
+      }
+      
+      # group by key - to combine different versions of pfizer (purple and gray) - separate later
+      master_key_child <- master_key_child |> 
+        group_by(mun_code, warehouse_code, batch_num, key, time_to_exp, avg) |> 
+        summarise(Cantidad = sum(Cantidad), .groups = 'drop')
+      
+      child_inventory_data <- child_inventory_data |> 
+        group_by(Almacen, `U. de Emisión`,batch_num, `Fecha Vto`,exp_date, time_to_exp, 
+                 vax_type, category,warehouse_code) |> 
+        summarise(Cantidad = sum(Cantidad), .groups = 'drop')
+      
+      # data for child vax allocation ------------------------------------------
+      master_key_child$dose_quantity <- master_key_child$Cantidad*6
+      child_days_to_allocate = child_days_allocated_value
+      
+      child.mun.doses <- child.mun.doses |> filter(Edad == 'Pediátrica')
+      
+      # add doses needed data from mun.doses file
+      master_key_child <- master_key_child |> 
+        left_join(child.mun.doses |> dplyr::select(mun_code, eligible_atleast_1dose), by='mun_code')
+      
+      
+      # sort master key child on expiration date
+      master_key_child <- master_key_child |> 
+        group_by(key) |> 
+        arrange(time_to_exp, .by_group = TRUE) |> 
+        ungroup() 
+      
+      # save Master_key_child file ---------------------------------------------
+      saveRDS(master_key_child, "appdata/master_key_child.rds")
+      
+      master_key_child$vax_admin_const <- round(master_key_child$avg*child_days_to_allocate, 0)
+      
+      # fix too low eligible cases ----------------------------------------------
+      # cases when the `eligible_atleast_1dose` is < vax_admin_const; change vax_admin_const = eligible_atleast_1dose
+      
+      master_key_child <- master_key_child %>% 
+        mutate(vax_admin_const = case_when(
+          vax_admin_const > eligible_atleast_1dose ~ eligible_atleast_1dose,
+          .default = vax_admin_const
+        ))
+      
+      
+      # lpsolve API -------------------------------------------------------------
+      
+      # RHS for constraints -----------------------------------------------------
+      # 1. municipality population constraint
+      mun_pop_const = master_key_child |> 
+        distinct(mun_code, eligible_atleast_1dose)
+      
+      mun_pop_const <- mun_pop_const$eligible_atleast_1dose |> unlist()
+      
+      # 2. municipality vaccine administration constraint
+      mun_admin_const = master_key_child |> 
+        distinct(mun_code, vax_admin_const)
+      
+      mun_admin_const <- mun_admin_const$vax_admin_const |> unlist()
+      
+      # 3. min vax allocation to Municipality - 10% of admin constraint
+      mun_min_const = master_key_child |> 
+        distinct(mun_code, vax_admin_const)
+      
+      mun_min_const$mun_min_const <- round(mun_min_const$vax_admin_const*0.1,0)
+      
+      mun_min_const <- mun_min_const$mun_min_const |> unlist()
+      
+      # 4. warehouse-batch doses available
+      batch_dose_const <- master_key_child |> 
+        distinct(key, dose_quantity)
+      
+      batch_dose_const <- batch_dose_const |> group_by(key) |> 
+        summarise(dose_quantity = sum(dose_quantity), .groups = 'drop')
+      
+      batch_dose_const <- batch_dose_const$dose_quantity |> unlist()
+      
+      # LHS constraint matrices -------------------------------------------------
+      # 1. municipality by by batch-warehouse matrix for population constraint
+      # 2. municipality by batch-warehouse matrix for administrative constraint
+      # 3. municipality matrix by batch-warehouse for min dose allocation -  10% of admin constraint
+      # use the same mun_list for all 3
+      
+      # create mun level constraint - each list is a set of coeff for each mun --> row codes for that mun
+      mun_mat <- master_key_child |> distinct(mun_code)
+      row.names(master_key_child) <- rownames(master_key_child$key)
+      
+      master_key_child2 <- rownames_to_column(master_key_child, 'row.code') 
+      
+      mun_list <- list()
+      
+      for(i in 1:nrow(mun_mat)){
+        
+        code <- mun_mat$mun_code[i]
+        master_fil <- master_key_child2 |> filter(mun_code == code)
+        
+        
+        mun_list[[i]] <- unlist(master_fil$row.code) |> as.numeric()
+        
+      }
+      
+      saveRDS(mun_list, "appdata/mun_list_child.rds")
+      
+      # 4. warehouse-batch by municipality matrix for doses constraint
+      #### used to calculate total vaccines allocated across all municipalities for each batch
+      #### which should <= to the total doses available for each batch
+      
+      # create batch level constraint -- rows for each batch
+      batch_list <- list()
+      
+      batch_codes <- unique(master_key_child$key)
+      
+      for (i in 1:length(batch_codes)) {
+        
+        keyx <- batch_codes[i]
+        batch_fil <- master_key_child2 |> filter(key == keyx)
+        
+        batch_list[[i]] <- unlist(batch_fil$row.code) |> as.numeric()
+      }
+      
+      saveRDS(batch_list, "appdata/batch_list_child.rds")
+      
+    }
+    
+    
+    
+    
     child_allocation <- child.vat.model(days_allocated = child_days_allocated_value,
                                         salmi_inventory2 = salmi_data_updated$dat)
     
@@ -1056,9 +1299,60 @@ server <- function(input, output) {
       relocate(region_name, .after = mun_name) %>% 
       relocate(Almacen, .after = region_name) %>% 
       relocate(Suministro, .after = Almacen)
+    saveRDS(child_allocation, "appdata/child_allocation.rds")
     
-    #saveRDS(child_allocation, "data/child_allocation.rds")
-    child_allocation
+    connections_key <- connections2 %>% 
+      filter(warehouse_code != "A")
+    
+    #Need to separate out rows from national warehouse
+    child_regional_allocs <- child_allocation %>% 
+      dplyr::filter(warehouse_code == "A")
+    
+    #All other ones --> ugly but easier rejoining after manipulation
+    child_remaining_allocs <- child_allocation %>%
+      dplyr::filter(warehouse_code != "A")
+    
+    #Match indices of these against the key to then replace warehouse info 
+    child_index_matches <- match(child_regional_allocs$mun_code,connections_key$mun_code)
+    
+    #NA ones --> only supplied by national (removed externos from data for now so that's probably why)
+    child_remaining_allocs <- rbind(child_remaining_allocs, child_regional_allocs[which(is.na(child_index_matches)),])
+    child_regional_allocs <- child_regional_allocs[-which(is.na(child_index_matches)),]
+    
+    child_index_matches <- match(child_regional_allocs$mun_code,connections_key$mun_code)
+    
+    #replace almacen, warehouse code, dep
+    child_regional_allocs$warehouse_code <- connections_key$warehouse_code[child_index_matches]
+    child_regional_allocs$Almacen <- connections_key$Almacen[child_index_matches]
+    child_regional_allocs$Dep <- connections_key$dep_clean[child_index_matches]
+    
+    #Rejoin with the allocation table --> replace original rows and then output nat'l to regional as another element in list output?
+    child_remaining_allocs <- rbind(child_remaining_allocs, child_regional_allocs)
+    
+    child_clean_allocs <- child_remaining_allocs %>% 
+      dplyr::select(Almacen, mun_name, batch_num, vax_allocated) %>%
+      dplyr::rename(Origin = Almacen, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
+      dplyr::mutate(Distribution = "Final")
+    
+    child_natl_allocs <- child_regional_allocs %>%#Need two of these --> 1 for allocs from natl to regional 1 from regional to muni
+      dplyr::select(Almacen, mun_name, batch_num, vax_allocated) %>%
+      dplyr::rename(Origin = Almacen, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
+      dplyr::mutate(Destination = Origin,
+                    Origin = "ALMACEN NACIONAL") %>%
+      dplyr::group_by(Origin, Destination, `Batch Num`) %>%
+      dplyr::summarise(Allocated = sum(Allocated)) %>%
+      ungroup() %>%
+      dplyr::mutate(Distribution = "Intermediate")
+    
+    child_clean_allocs <- rbind(child_clean_allocs, child_natl_allocs) %>%
+      dplyr::arrange(Origin, Destination, `Batch Num`)
+    
+    #Create output list for user --> first one has all final distribution legs, second one has all intermediate, third one is clean for data table --> download all of them?
+    child_allocation_list <- list(child_remaining_allocs, child_natl_allocs, child_clean_allocs)
+    names(child_allocation_list) <- c("final", "intermediate", "clean")
+    
+    child_allocation_list
+   
   })
   
   
@@ -1081,7 +1375,11 @@ server <- function(input, output) {
   
   # model map-----
   output$child_dist_map <-  renderLeaflet({
-    child_allocation <- child_allocation()
+    child_allocation_list <- child_allocation()
+    
+    child_allocation <- child_allocation_list$final
+    child_inter_alloc <- child_allocation_list$intermediate
+    
     if(isTruthy(child_allocation)) {
       child_allocation$key <- paste(child_allocation$Almacen, child_allocation$mun_code, sep = "_")
       
@@ -1128,7 +1426,7 @@ server <- function(input, output) {
       #Remove central to muni --> FLAG TEMP SOLUTION TILL MODEL FIXED
       flows2 <- flows2[flows2$Origin != "ALMACEN NACIONAL",]
       
-      leaflet() %>%
+      out_leaf <- leaflet() %>%
         addProviderTiles("OpenStreetMap") %>%
         addPolylines(data = flows2, 
                      label = label_list,
@@ -1145,17 +1443,75 @@ server <- function(input, output) {
                     fill = F,
                     opacity = 1)
     }
- 
     
+    
+    if(isTruthy(child_inter_alloc)) {
+      #Join warehouse coords --> I'm sorry Hadley Wickham
+      child_inter_alloc[,c("lon1", "lat1")] <- connections2[match(child_inter_alloc$Origin,connections2$Almacen),c("lon2", "lat2")]
+      child_inter_alloc[,c("lon2", "lat2")] <- connections2[match(child_inter_alloc$Destination,connections2$Almacen),c("lon2", "lat2")]
+      
+      
+      child_inter_flows <- gcIntermediate(child_inter_alloc[,c("lat1", "lon1")], 
+                                          child_inter_alloc[,c("lat2", "lon2")],
+                                          sp = T,
+                                          addStartEnd = T)
+      
+      child_inter_flows$Origin <- child_inter_alloc$Origin
+      child_inter_flows$Destination <- child_inter_alloc$Destination
+      child_inter_flows$Batch_Num <- child_inter_alloc$`Batch Num`
+      child_inter_flows$Vax_Allocated <- child_inter_alloc$Allocated
+      
+      child_inter_label_list <- list()
+      child_inter_popup_list <- list()
+      for(i in 1:nrow(child_inter_flows)) {
+        child_inter_label_list[[i]] <- paste0(str_to_title(child_inter_flows$Origin[i]), " a ", child_inter_flows$Destination[i])
+        child_inter_popup_list[[i]] <- paste(glue::glue("<b>{str_to_title(child_inter_flows$Origin[i])} a {child_inter_flows$Destination[i]}</b>"),  
+                                       glue::glue("<i>Número de lote</i>: {child_inter_flows$Batch_Num[i]}"),
+                                       glue::glue("<i>Vacunas Asignadas</i>: {child_inter_flows$Vax_Allocated[i]}"),
+                                       sep = "</br>")
+      }
+      
+      child_inter_origin_almacen <- child_inter_alloc |> 
+        dplyr::select(Origin, lon1, lat1) |> 
+        st_as_sf(coords = c("lat1", "lon1"))
+      
+      child_inter_dest_almacen <-  child_inter_alloc |> 
+        dplyr::select(Destination, lon2, lat2) |> 
+        st_as_sf(coords = c("lat2", "lon2"))
+      
+      
+      out_leaf <- out_leaf %>%
+        addPolylines(data = child_inter_flows, 
+                     label = child_inter_label_list,
+                     popup = child_inter_popup_list,
+                     group = ~Origin, color = "Grey") %>%
+        addCircleMarkers(data = child_inter_origin_almacen, radius = 1.5, label = ~as.character(Origin)) |>
+        addCircleMarkers(data = child_inter_dest_almacen, radius = 0.75, color = 'red', label = ~as.character(Destination)) 
+      # addLayersControl(overlayGroups = unique(inter_flows$Origin),
+      #                  options = layersControlOptions(collapsed = T))
+      
+      
+    }
+    
+    out_leaf
   })
   
   # display the allocation table -------
   
   output$child_prop_dist_dt <- DT::renderDT({
-    child_allocation() |> 
-      dplyr::select(mun_code, mun_name, region_name, Almacen, Suministro, batch_num, avg, 
-                    vax_admin_const, eligible_atleast_1dose,vax_allocated) %>% 
-      rename(Municipality = mun_name, vax_doses_allocated = vax_allocated)
+    
+    child_allocation_list <- child_allocation()
+    
+    child_allocation_list$clean
+    
+    
+    # 
+    # child_allocation() |> 
+    #   dplyr::select(mun_code, mun_name, region_name, Almacen, Suministro, batch_num, avg, 
+    #                 vax_admin_const, eligible_atleast_1dose,vax_allocated) %>% 
+    #   rename(Municipality = mun_name, vax_doses_allocated = vax_allocated)
+    
+    
   })
   
   output$child_vax_allocation_download <- downloadHandler(
