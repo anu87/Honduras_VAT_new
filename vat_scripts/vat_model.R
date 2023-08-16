@@ -56,12 +56,20 @@ key_base_2 <- salmi_inventory2 %>%
   dplyr::select(Dep)
 
 #If they ever add more than 26 warehouses then figure out a better way to do this but until then no thank you
-# warehouse_codes <- key_base_2 %>%
-#   dplyr::select(Dep) %>%
-#   distinct()
-# warehouse_codes$warehouse_code <-LETTERS[1:nrow(warehouse_codes)]
+warehouse_codes <- key_base %>%
+  dplyr::select(dep_clean) %>%
+  distinct()
 
-warehouse_codes <- read_rds("appdata/warehouse_codes_revised.rds")
+#National not in this one
+natl_df <- data.frame("Almacen Nacional")
+names(natl_df) <- c("dep_clean")
+
+warehouse_codes <- rbind(natl_df, warehouse_codes)
+
+
+warehouse_codes$warehouse_code <-LETTERS[1:nrow(warehouse_codes)]
+
+#warehouse_codes <- read_rds("appdata/warehouse_codes_revised.rds")
 
 salmi_inventory3 <- left_join(salmi_inventory2, warehouse_codes, by = c("Dep")) %>%
   dplyr::filter(category == "vaccine")

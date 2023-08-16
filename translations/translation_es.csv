@@ -51,3 +51,4 @@ Eligible population served by vaccination site: a vaccination site cannot be giv
 Batch size: the amount of vaccines distributed must be less than the number of vaccines available in each batch.,Tamaño del lote: la cantidad de vacunas distribuidas debe ser inferior al número de vacunas disponibles en cada lote.
 Vaccine allocation should be distributed evenly across vaccination sites: all vaccination sites should receive vaccines for at least a certain percentage of the population they serve.,La asignación de vacunas debe distribuirse uniformemente entre los centros de vacunación: todos los centros de vacunación deben recibir vacunas para al menos un determinado porcentaje de la población a la que atienden.
 Regional Warehouses to Municipalities,Almacenes regionales a los municipios
+Please press the button below to run the vaccine allocation model.,Pulse el botón siguiente para ejecutar el modelo de asignación de vacunas.

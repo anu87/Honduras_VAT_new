@@ -8,9 +8,13 @@ vat.model <- function(days_allocated = days_allocated_value,
   master_key_adult <- readRDS("appdata/master_key_adult.rds")
   batch_list <- readRDS("appdata/batch_list.rds")
   mun_list <- readRDS("appdata/mun_list.rds")
-  warehouse_codes <- readRDS("appdata/warehouse_codes_revised.rds") #Flag that this is manual
+  #warehouse_codes <- readRDS("appdata/warehouse_codes_revised.rds") #Flag that this is manual
   vax_network_codes <- readRDS('appdata/site_mun_dep_codes.rds')
   connections <- readRDS("appdata/connections.rds")
+  warehouse_codes <- full_info %>%
+    dplyr::select(dep_clean, warehouse_code) %>%
+    distinct() %>%
+    arrange(warehouse_code)
   #salmi_app_data <- readRDS("appdata/salmi_app_data.rds")
   #salmi_inventory2 <- readRDS("appdata/salmi_inventory2.rds")
   
@@ -128,10 +132,9 @@ vat.model <- function(days_allocated = days_allocated_value,
   
   # add back warehouse names to the data
   allocation2 <- allocation %>% 
-    left_join(connections %>% distinct(Almacen, warehouse_code), by='warehouse_code')
+    left_join(connections %>% distinct(dep_clean, warehouse_code), by=c('warehouse_code', "dep_clean"))
   
   allocation2 <- allocation2 %>%
     left_join(salmi_inventory2 %>% filter(category=='vaccine') %>% distinct(batch_num, Suministro), by= ("batch_num"))
-  
   
 }

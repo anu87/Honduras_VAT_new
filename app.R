@@ -78,21 +78,68 @@ Municipio_Hist <- readRDS("data/Municipio_Hist.rds")
 Mun_shp_vax <- readRDS("data/joined_adm2.rds")
 vax_network_codes <- readRDS('data/site_mun_dep_codes.rds')
 site_hist <- readRDS("data/Site_Hist.rds")
-mun.doses <- readRDS("data/mun_doses_needed.rds")
 mun_avg_vax_rate <- readRDS('data/mun_avg_vax_rate.rds')
 
-connections2 <- readRDS("appdata/connections.rds") #IK FLAG TO FIX --> JOIN GETTING MESSED UP 
+connections2 <- readRDS("appdata/connections.rds") 
 
-net_to_munis <- read_rds("appdata/full_net_leaflet.rds")
+#net_to_munis <- read_rds("appdata/full_net_leaflet.rds")
 
 
 adm2 <- read_rds("appdata/Adm2_w_Pops.rds")
+
+
+mun.doses <- readRDS("data/mun_doses_needed.rds")
+mun.doses <- mun.doses |>
+  mutate(region_code = case_when(
+    is.na(region_code) ~ substr(mun_code,1,2),
+    .default = region_code
+  ))
+
+mun.doses <-mun.doses|>
+  dplyr::group_by(Dep, region_code, mun_name, mun_code, Edad) |>
+  dplyr::summarise( world_pop = max(world_pop),across(`1R`:eligible_atleast_1dose, ~sum(.x, na.rm = TRUE)), .groups = 'drop')
+
+
+
+mun.doses <- mun.doses |>
+  left_join(mun_avg_vax_rate |> dplyr::select(-mun_name), by='mun_code')
+
+# mun.doses <- mun.doses |>
+#   mutate(avg.daily.rate = case_when(
+#     avg.daily.rate <10 & eligible_atleast_1dose <300 ~ 10, #300 because avg 10 * 30 days for allocation
+#     eligible_atleast_1dose >=300 ~ eligible_atleast_1dose,
+#     .default = avg.daily.rate
+#   ))
+
+mun.doses$avg.daily.rate <- ifelse(mun.doses$avg.daily.rate<5, 5, mun.doses$avg.daily.rate)
+
+mun.doses$eligible_atleast_1dose <- ifelse(is.na(mun.doses$eligible_atleast_1dose), mun.doses$world_pop,
+                                           mun.doses$eligible_atleast_1dose)
+
+mun.doses$eligible_atleast_1dose <- ifelse(mun.doses$eligible_atleast_1dose<0, mun.doses$world_pop,
+                                           mun.doses$eligible_atleast_1dose)
+
+# 1. matrix of mun with warehouses
+
+mun.doses$Dep2 <- stri_trans_general(gsub("Departamental de |Metropolitana del | Metropolitana de ", "", mun.doses$Dep), 'latin-ascii') %>%
+  trimws()
+
+
+
+full_info <- read_rds("appdata/full_info.rds")
+warehouse_codes <- full_info %>%
+  dplyr::select(dep_clean, warehouse_code) %>%
+  distinct() %>%
+  arrange(warehouse_code)
+
+
 #adm2 <- st_simplify(adm2, dTolerance = 100) #Improve runtime
 #saveRDS(adm2, "appdata/adm2_w_pops.rds")
 
 # source model function ---------------------------------------------------
 source("vat_scripts/model_app.R")
 source("vat_scripts/child_model_app.R")
+
 
 # ui ----------------------------------------------------------------------
 
@@ -351,7 +398,6 @@ server <- function(input, output) {
   
   # network map ----------
   output$full_network <- renderLeaflet({
-    # 
     
     # remove rows where origin and destination warehouse are the same
     connections <- connections |> 
@@ -398,22 +444,18 @@ server <- function(input, output) {
   })
   
   output$full_network_to_munis <- renderLeaflet({
-    
-    connections2 <- connections2 |> rename(lat12 = lon1, lon1 = lat1)
-    
-    connections2 <- connections2 |> rename(lat1 = lat12)
-    
+
     connections2 <- connections2 %>%
       filter(warehouse_code != "A")
 
     flows <- gcIntermediate(connections2[,c("lon1", "lat1")], 
-                            connections2[,c("lat2", "lon2")],
+                            connections2[,c("lon2", "lat2")],
                             sp = T,
                             addStartEnd = T)
     
     
     flows$origins <- connections2$mun_name
-    flows$destinations <- connections2$Almacen
+    flows$destinations <- connections2$dep_clean
     
     
     hover <- paste0(flows$origins, " a ", 
@@ -422,8 +464,8 @@ server <- function(input, output) {
     pal <- colorFactor(brewer.pal(4, "Set2"), flows$origins)
     
     origin_wh <-  connections2 |> 
-      dplyr::select(Almacen, lon2, lat2) |> 
-      st_as_sf(coords = c("lat2", "lon2"))
+      dplyr::select(dep_clean, lon2, lat2) |> 
+      st_as_sf(coords = c("lon2", "lat2"))
     
     dest_wh <-  connections2 |> 
       dplyr::select(mun_name, lon1, lat1) |> 
@@ -434,7 +476,7 @@ server <- function(input, output) {
       addPolylines(data = flows, 
                    # label = hover,
                    group = ~origins, color = ~pal(origins)) %>%
-      addCircleMarkers(data = origin_wh, radius = 1.5, label = ~as.character(Almacen)) |>
+      addCircleMarkers(data = origin_wh, radius = 1.5, label = ~as.character(dep_clean)) |>
       addCircleMarkers(data = dest_wh, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
       addLayersControl(overlayGroups = unique(flows$origins),
                        options = layersControlOptions(collapsed = T))
@@ -543,87 +585,10 @@ server <- function(input, output) {
 
       # datasets to create------
       # add average vax data to mun file; anywhere daily average is < 1, make it 5 (mean) - so that they atleast get some vaccines
+      # 
       
-      mun.doses <- mun.doses |> 
-        mutate(region_code = case_when(
-          is.na(region_code) ~ substr(mun_code,1,2),
-          .default = region_code
-        ))
-      
-      mun.doses <-mun.doses|> 
-        dplyr::group_by(Dep, region_code, mun_name, mun_code, Edad) |> 
-        dplyr::summarise( world_pop = max(world_pop),across(`1R`:eligible_atleast_1dose, ~sum(.x, na.rm = TRUE)), .groups = 'drop')  
-      
-      
-      
-      mun.doses <- mun.doses |> 
-        left_join(mun_avg_vax_rate |> dplyr::select(-mun_name), by='mun_code')
-      
-      # mun.doses <- mun.doses |>
-      #   mutate(avg.daily.rate = case_when(
-      #     avg.daily.rate <10 & eligible_atleast_1dose <300 ~ 10, #300 because avg 10 * 30 days for allocation
-      #     eligible_atleast_1dose >=300 ~ eligible_atleast_1dose,
-      #     .default = avg.daily.rate
-      #   ))
-      
-      mun.doses$avg.daily.rate <- ifelse(mun.doses$avg.daily.rate<5, 5, mun.doses$avg.daily.rate)
-      
-      mun.doses$eligible_atleast_1dose <- ifelse(is.na(mun.doses$eligible_atleast_1dose), mun.doses$world_pop, 
-                                                 mun.doses$eligible_atleast_1dose)
-      
-      mun.doses$eligible_atleast_1dose <- ifelse(mun.doses$eligible_atleast_1dose<0, mun.doses$world_pop, 
-                                                 mun.doses$eligible_atleast_1dose)
-      
-      # 1. matrix of mun with warehouses
-      
-      mun.doses$Dep2 <- stri_trans_general(gsub("Departamental de |Metropolitana del | Metropolitana de ", "", mun.doses$Dep), 'latin-ascii') %>%
-        trimws()
-      
-      # mun.doses$Dep2 %>% unique()
-      
-      
-      #We want file with municipal doses with name of the salmi warehouse next to it 
-      #Just need department, region code, municipal code, municipal name, warehouse name --> remove all the numbers from mun.doses
-      #Create warehouse code and then a region code
-      
-      
-      key_base <- mun.doses %>%
-        dplyr::select(Dep2, Dep, region_code, mun_name, mun_code) %>%
-        dplyr::rename(dep_clean = Dep2,
-                      dep_full = Dep)
-      
-      print(key_base)
-      key_base_2 <- updated_inventory %>%
-        dplyr::select(Dep)
-      
-      #If they ever add more than 26 warehouses then figure out a better way to do this but until then no thank you
-      # warehouse_codes <- key_base_2 %>%
-      #   dplyr::select(Dep) %>%
-      #   distinct()
-      # warehouse_codes$warehouse_code <-LETTERS[1:nrow(warehouse_codes)]
-      
-      warehouse_codes <- read_rds("appdata/warehouse_codes_revised.rds")
-      
-      salmi_inventory3 <- left_join(updated_inventory, warehouse_codes, by = c("Dep")) %>%
+      salmi_inventory3 <- left_join(updated_inventory, warehouse_codes, by = c("Dep" = "dep_clean")) %>%
         dplyr::filter(category == "vaccine")
-      
-      
-      
-      tmp_joined <- left_join(key_base, key_base_2, by = c("dep_clean" = "Dep")) %>% distinct()
-      info_joined <- left_join(tmp_joined, warehouse_codes, by = c("dep_clean" = "Dep")) %>%
-        dplyr::filter(!is.na(region_code)) #Double check with anu
-      nat_info <- info_joined %>%
-        dplyr::select(mun_name, mun_code) %>%
-        dplyr::mutate(dep_clean = "",
-                      dep_full = "",
-                      region_code = "", 
-                      warehouse_code = "A")
-      
-      full_info <- rbind(info_joined, nat_info) %>%
-        dplyr::filter(!is.na(warehouse_code))
-      
-      saveRDS(full_info, "appdata/full_info.rds")
-      
       
       #Make adult data key
       adults_inventory_data <- salmi_inventory3 %>%
@@ -649,6 +614,8 @@ server <- function(input, output) {
         }
       }
       
+      
+      #IK FLAG --> NEED TO FIGURE OUT WAY TO RUN FASTER
       #Now add rows for every municipality
       for(i in 1:nrow(new_df)) {
         filtered_munis <- full_info %>% 
@@ -809,12 +776,12 @@ server <- function(input, output) {
     
     allocation <- allocation %>% 
       relocate(mun_name, .after = mun_code) %>% 
-      relocate(region_name, .after = mun_name) %>% 
-      relocate(Almacen, .after = region_name) %>% 
-      relocate(Suministro, .after = Almacen)
+      relocate(region_name, .after = mun_name) #%>% 
+      # relocate(Almacen, .after = region_name) %>% 
+      # relocate(Suministro, .after = Almacen)
     saveRDS(allocation, "appdata/allocation.rds")
     
-    
+    #IK FLAG STOPPING POINT 8/16
     connections_key <- connections2 %>% 
       filter(warehouse_code != "A")
     
@@ -829,30 +796,29 @@ server <- function(input, output) {
     #Match indices of these against the key to then replace warehouse info 
     index_matches <- match(regional_allocs$mun_code,connections_key$mun_code)
     
+    #I think this is fixed by adding Choluteca/Ocotepeque 
     #NA ones --> only supplied by national (removed externos from data for now so that's probably why)
-    remaining_allocs <- rbind(remaining_allocs, regional_allocs[which(is.na(index_matches)),])
-    regional_allocs <- regional_allocs[-which(is.na(index_matches)),]
-    
-    index_matches <- match(regional_allocs$mun_code,connections_key$mun_code)
+    # remaining_allocs <- rbind(remaining_allocs, regional_allocs[which(is.na(index_matches)),])
+    # regional_allocs <- regional_allocs[-which(is.na(index_matches)),]
+    # index_matches <- match(regional_allocs$mun_code,connections_key$mun_code)
     
     #replace almacen, warehouse code, dep
     regional_allocs$warehouse_code <- connections_key$warehouse_code[index_matches]
-    regional_allocs$Almacen <- connections_key$Almacen[index_matches]
-    regional_allocs$Dep <- connections_key$dep_clean[index_matches]
+    regional_allocs$dep_clean <- connections_key$dep_clean[index_matches]
     
     #Rejoin with the allocation table --> replace original rows and then output nat'l to regional as another element in list output?
     remaining_allocs <- rbind(remaining_allocs, regional_allocs)
     
     clean_allocs <- remaining_allocs %>% 
-      dplyr::select(Almacen, mun_name, batch_num, vax_allocated) %>%
-      dplyr::rename(Origin = Almacen, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
+      dplyr::select(dep_clean, mun_name, batch_num, vax_allocated) %>%
+      dplyr::rename(Origin = dep_clean, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
       dplyr::mutate(Distribution = "Final")
     
     natl_allocs <- regional_allocs %>%#Need two of these --> 1 for allocs from natl to regional 1 from regional to muni
-      dplyr::select(Almacen, mun_name, batch_num, vax_allocated) %>%
-      dplyr::rename(Origin = Almacen, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
+      dplyr::select(dep_clean, mun_name, batch_num, vax_allocated) %>%
+      dplyr::rename(Origin = dep_clean, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
       dplyr::mutate(Destination = Origin,
-                    Origin = "ALMACEN NACIONAL") %>%
+                    Origin = "Almacen Nacional") %>%
       dplyr::group_by(Origin, Destination, `Batch Num`) %>%
       dplyr::summarise(Allocated = sum(Allocated)) %>%
       ungroup() %>%
@@ -900,18 +866,17 @@ server <- function(input, output) {
     inter_alloc <- allocation_list$intermediate
     
     if(isTruthy(allocation)) {
-      allocation$key <- paste(allocation$Almacen, allocation$mun_code, sep = "_")
-      
-      connections2$key <- paste(connections2$Almacen, connections2$mun_code, sep = "_")
+      allocation$key <- paste(allocation$dep_clean, allocation$mun_code, sep = "_")
+      connections2$key <- paste(connections2$dep_clean, connections2$mun_code, sep = "_")
       
       allocation_joined <- left_join(allocation, connections2, by = "key") %>% as.tibble()
       
-      flows2 <- gcIntermediate(allocation_joined[,c("lat1", "lon1")], 
-                               allocation_joined[,c("lat2", "lon2")],
+      flows2 <- gcIntermediate(allocation_joined[,c("lon1", "lat1")], 
+                               allocation_joined[,c("lon2", "lat2")],
                                sp = T,
                                addStartEnd = T)
       
-      flows2$Origin <- allocation_joined$Almacen.x
+      flows2$Origin <- allocation_joined$dep_clean.x
       flows2$Destination <- allocation_joined$mun_name.x
       flows2$Suministro <- allocation_joined$Suministro
       flows2$Batch_Num <- allocation_joined$batch_num
@@ -932,12 +897,12 @@ server <- function(input, output) {
       pal <- colorFactor(brewer.pal(4, "Set2"), flows2$Origin)
       
       origin_almacen <-  connections2 |> 
-        dplyr::select(Almacen, lon2, lat2) |> 
-        st_as_sf(coords = c("lat2", "lon2"))
+        dplyr::select(dep_clean, lon2, lat2) |> 
+        st_as_sf(coords = c("lon2", "lat2"))
       
       dest_mun <-  connections2 |> 
         dplyr::select(mun_name, lon1, lat1) |> 
-        st_as_sf(coords = c("lat1", "lon1"))
+        st_as_sf(coords = c("lon1", "lat1"))
       
       #Remove central to muni --> FLAG TEMP SOLUTION TILL MODEL FIXED
       #flows2 <- flows2[flows2$Origin != "ALMACEN NACIONAL",]
@@ -948,7 +913,7 @@ server <- function(input, output) {
                      label = label_list,
                      popup = popup_list,
                      group = ~Origin, color = ~pal(Origin)) %>%
-        addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(Almacen)) |>
+        addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(dep_clean)) |>
         addCircleMarkers(data = dest_mun, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
         addLayersControl(overlayGroups = unique(flows2$origins),
                          options = layersControlOptions(collapsed = T))%>%
@@ -962,12 +927,12 @@ server <- function(input, output) {
     
     if(isTruthy(inter_alloc)) {
       #Join warehouse coords --> I'm sorry Hadley Wickham
-      inter_alloc[,c("lon1", "lat1")] <- connections2[match(inter_alloc$Origin,connections2$Almacen),c("lon2", "lat2")]
-      inter_alloc[,c("lon2", "lat2")] <- connections2[match(inter_alloc$Destination,connections2$Almacen),c("lon2", "lat2")]
+      inter_alloc[,c("lon1", "lat1")] <- connections2[match(inter_alloc$Origin,connections2$dep_clean),c("lon2", "lat2")]
+      inter_alloc[,c("lon2", "lat2")] <- connections2[match(inter_alloc$Destination,connections2$dep_clean),c("lon2", "lat2")]
       
       
-      inter_flows <- gcIntermediate(inter_alloc[,c("lat1", "lon1")], 
-                                    inter_alloc[,c("lat2", "lon2")],
+      inter_flows <- gcIntermediate(inter_alloc[,c("lon1", "lat1")], 
+                                    inter_alloc[,c("lon2", "lat2")],
                                     sp = T,
                                     addStartEnd = T)
       
@@ -989,11 +954,11 @@ server <- function(input, output) {
       
       inter_origin_almacen <-  inter_alloc |> 
         dplyr::select(Origin, lon1, lat1) |> 
-        st_as_sf(coords = c("lat1", "lon1"))
+        st_as_sf(coords = c("lon1", "lat1"))
       
       inter_dest_almacen <-  inter_alloc |> 
         dplyr::select(Destination, lon2, lat2) |> 
-        st_as_sf(coords = c("lat2", "lon2"))
+        st_as_sf(coords = c("lon2", "lat2"))
       
       
       out_leaf <- out_leaf %>%
@@ -1054,65 +1019,12 @@ server <- function(input, output) {
     
     if(isTruthy(updated_inventory)) { #Change to check if warehouse data changed or not
       
-      child.mun.doses <- mun.doses |> 
-        mutate(region_code = case_when(
-          is.na(region_code) ~ substr(mun_code,1,2),
-          .default = region_code
-        ))
-      
-      child.mun.doses <-child.mun.doses|> 
-        dplyr::group_by(Dep, region_code, mun_name, mun_code, Edad) |> 
-        dplyr::summarise(world_pop = max(world_pop),across(`1R`:eligible_atleast_1dose, ~sum(.x, na.rm = TRUE)), .groups = 'drop')  
-      
-      child.mun.doses <- child.mun.doses |> 
-        left_join(mun_avg_vax_rate |> dplyr::select(-mun_name), by='mun_code')
-     
-      child.mun.doses$avg.daily.rate <- ifelse(child.mun.doses$avg.daily.rate<5, 5, child.mun.doses$avg.daily.rate)
-      
-      child.mun.doses$eligible_atleast_1dose <- ifelse(is.na(child.mun.doses$eligible_atleast_1dose), child.mun.doses$world_pop, 
-                                                       child.mun.doses$eligible_atleast_1dose)
-      
-      child.mun.doses$eligible_atleast_1dose <- ifelse(child.mun.doses$eligible_atleast_1dose<0, child.mun.doses$world_pop, 
-                                                       child.mun.doses$eligible_atleast_1dose)
       
       
+      #warehouse_codes <- read_rds("appdata/warehouse_codes_revised.rds")
       
-      # 1. matrix of mun with warehouses
-      
-      child.mun.doses$Dep2 <- stri_trans_general(gsub("Departamental de |Metropolitana del | Metropolitana de ", "", child.mun.doses$Dep), 'latin-ascii') %>%
-        trimws()
-      
-      
-      #We want file with municipal doses with name of the salmi warehouse next to it 
-      #Just need department, region code, municipal code, municipal name, warehouse name --> remove all the numbers from mun.doses
-      #Create warehouse code and then a region code
-      
-      key_base <- child.mun.doses %>%
-        dplyr::select(Dep2, Dep, region_code, mun_name, mun_code) %>%
-        dplyr::rename(dep_clean = Dep2,
-                      dep_full = Dep)
-      
-      key_base_2 <- updated_inventory %>%
-        dplyr::select(Dep)
-      
-      warehouse_codes <- read_rds("appdata/warehouse_codes_revised.rds")
-      
-      salmi_inventory3 <- left_join(updated_inventory, warehouse_codes, by = c("Dep")) %>%
+      salmi_inventory3 <- left_join(updated_inventory, warehouse_codes, by = c("Dep" = "dep_clean")) %>%
         dplyr::filter(category == "vaccine")
-      
-      tmp_joined <- left_join(key_base, key_base_2, by = c("dep_clean" = "Dep")) %>% distinct()
-      info_joined <- left_join(tmp_joined, warehouse_codes, by = c("dep_clean" = "Dep")) %>%
-        dplyr::filter(!is.na(region_code)) #Double check with anubhuti --> Flag to figure out Ocatepeque Choluteca 8/10
-      
-      nat_info <- info_joined %>% 
-        dplyr::select(mun_name, mun_code) %>%
-        dplyr::mutate(dep_clean = "",
-                      dep_full = "",
-                      region_code = "", 
-                      warehouse_code = "A")
-      
-      full_info <- rbind(info_joined, nat_info) %>%
-        dplyr::filter(!is.na(warehouse_code))
       
       #Make child data key
       child_inventory_data <- salmi_inventory3 %>%
@@ -1148,7 +1060,7 @@ server <- function(input, output) {
             dplyr::select(mun_code, warehouse_code, batch_num, key, Cantidad, time_to_exp)
           
           
-          muni_avg <-  child.mun.doses %>% 
+          muni_avg <- mun.doses %>% 
             dplyr::filter(mun_code == merged_info$mun_code, Edad == "Pediátrica") %>% dplyr::select(avg.daily.rate) %>%
             head(1) %>%
             unlist() %>%
@@ -1181,11 +1093,11 @@ server <- function(input, output) {
       master_key_child$dose_quantity <- master_key_child$Cantidad*6
       child_days_to_allocate = child_days_allocated_value
       
-      child.mun.doses <- child.mun.doses |> filter(Edad == 'Pediátrica')
+      mun.doses.child <- mun.doses |> filter(Edad == 'Pediátrica')
       
       # add doses needed data from mun.doses file
       master_key_child <- master_key_child |> 
-        left_join(child.mun.doses |> dplyr::select(mun_code, eligible_atleast_1dose), by='mun_code')
+        left_join(mun.doses.child |> dplyr::select(mun_code, eligible_atleast_1dose), by='mun_code')
       
       
       # sort master key child on expiration date
@@ -1296,9 +1208,9 @@ server <- function(input, output) {
     
     child_allocation <- child_allocation %>% 
       relocate(mun_name, .after = mun_code) %>% 
-      relocate(region_name, .after = mun_name) %>% 
-      relocate(Almacen, .after = region_name) %>% 
-      relocate(Suministro, .after = Almacen)
+      relocate(region_name, .after = mun_name) #%>% 
+      # relocate(Almacen, .after = region_name) %>% 
+      # relocate(Suministro, .after = Almacen)
     saveRDS(child_allocation, "appdata/child_allocation.rds")
     
     connections_key <- connections2 %>% 
@@ -1315,30 +1227,29 @@ server <- function(input, output) {
     #Match indices of these against the key to then replace warehouse info 
     child_index_matches <- match(child_regional_allocs$mun_code,connections_key$mun_code)
     
-    #NA ones --> only supplied by national (removed externos from data for now so that's probably why)
-    child_remaining_allocs <- rbind(child_remaining_allocs, child_regional_allocs[which(is.na(child_index_matches)),])
-    child_regional_allocs <- child_regional_allocs[-which(is.na(child_index_matches)),]
-    
-    child_index_matches <- match(child_regional_allocs$mun_code,connections_key$mun_code)
+    # #NA ones --> only supplied by national (removed externos from data for now so that's probably why)
+    # child_remaining_allocs <- rbind(child_remaining_allocs, child_regional_allocs[which(is.na(child_index_matches)),])
+    # child_regional_allocs <- child_regional_allocs[-which(is.na(child_index_matches)),]
+    # 
+    # child_index_matches <- match(child_regional_allocs$mun_code,connections_key$mun_code)
     
     #replace almacen, warehouse code, dep
     child_regional_allocs$warehouse_code <- connections_key$warehouse_code[child_index_matches]
-    child_regional_allocs$Almacen <- connections_key$Almacen[child_index_matches]
-    child_regional_allocs$Dep <- connections_key$dep_clean[child_index_matches]
+    child_regional_allocs$dep_clean <- connections_key$dep_clean[child_index_matches]
     
     #Rejoin with the allocation table --> replace original rows and then output nat'l to regional as another element in list output?
     child_remaining_allocs <- rbind(child_remaining_allocs, child_regional_allocs)
     
     child_clean_allocs <- child_remaining_allocs %>% 
-      dplyr::select(Almacen, mun_name, batch_num, vax_allocated) %>%
-      dplyr::rename(Origin = Almacen, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
+      dplyr::select(dep_clean, mun_name, batch_num, vax_allocated) %>%
+      dplyr::rename(Origin = dep_clean, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
       dplyr::mutate(Distribution = "Final")
     
     child_natl_allocs <- child_regional_allocs %>%#Need two of these --> 1 for allocs from natl to regional 1 from regional to muni
-      dplyr::select(Almacen, mun_name, batch_num, vax_allocated) %>%
-      dplyr::rename(Origin = Almacen, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
+      dplyr::select(dep_clean, mun_name, batch_num, vax_allocated) %>%
+      dplyr::rename(Origin = dep_clean, Destination = mun_name, `Batch Num` = batch_num, Allocated = vax_allocated) %>%
       dplyr::mutate(Destination = Origin,
-                    Origin = "ALMACEN NACIONAL") %>%
+                    Origin = "Almacen Nacional") %>%
       dplyr::group_by(Origin, Destination, `Batch Num`) %>%
       dplyr::summarise(Allocated = sum(Allocated)) %>%
       ungroup() %>%
@@ -1381,21 +1292,20 @@ server <- function(input, output) {
     child_inter_alloc <- child_allocation_list$intermediate
     
     if(isTruthy(child_allocation)) {
-      child_allocation$key <- paste(child_allocation$Almacen, child_allocation$mun_code, sep = "_")
+      child_allocation$key <- paste(child_allocation$dep_clean, child_allocation$mun_code, sep = "_")
+      connections2$key <- paste(connections2$dep_clean, connections2$mun_code, sep = "_")
       
-      connections2$key <- paste(connections2$Almacen, connections2$mun_code, sep = "_")
-      
-      child_alloc_joined <- left_join(child_allocation, connections2, by = "key") %>% as.tibble()
-      
+      child_alloc_joined <- left_join(child_allocation, connections2, by = c("key")) %>% as.tibble()
       
       
-      flows2 <- gcIntermediate(child_alloc_joined[,c("lat1", "lon1")], 
-                               child_alloc_joined[,c("lat2", "lon2")],
+      
+      flows2 <- gcIntermediate(child_alloc_joined[,c("lon1", "lat1")], 
+                               child_alloc_joined[,c("lon2", "lat2")],
                                sp = T,
                                addStartEnd = T)
       
       
-      flows2$Origin <- child_alloc_joined$Almacen.x
+      flows2$Origin <- child_alloc_joined$dep_clean.x
       flows2$Destination <- child_alloc_joined$mun_name.x
       flows2$Suministro <- child_alloc_joined$Suministro
       flows2$Batch_Num <- child_alloc_joined$batch_num
@@ -1416,15 +1326,15 @@ server <- function(input, output) {
       pal <- colorFactor(brewer.pal(4, "Set2"), flows2$Origin)
       
       origin_almacen <-  connections2 |> 
-        dplyr::select(Almacen, lon2, lat2) |> 
-        st_as_sf(coords = c("lat2", "lon2"))
+        dplyr::select(dep_clean, lon2, lat2) |> 
+        st_as_sf(coords = c("lon2", "lat2"))
       
       dest_mun <-  connections2 |> 
         dplyr::select(mun_name, lon1, lat1) |> 
-        st_as_sf(coords = c("lat1", "lon1"))
+        st_as_sf(coords = c("lon1", "lat1"))
       
-      #Remove central to muni --> FLAG TEMP SOLUTION TILL MODEL FIXED
-      flows2 <- flows2[flows2$Origin != "ALMACEN NACIONAL",]
+      # #Remove central to muni --> FLAG TEMP SOLUTION TILL MODEL FIXED
+      # flows2 <- flows2[flows2$Origin != "ALMACEN NACIONAL",]
       
       out_leaf <- leaflet() %>%
         addProviderTiles("OpenStreetMap") %>%
@@ -1432,7 +1342,7 @@ server <- function(input, output) {
                      label = label_list,
                      popup = popup_list,
                      group = ~Origin, color = ~pal(Origin)) %>%
-        addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(Almacen)) |>
+        addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(dep_clean)) |>
         addCircleMarkers(data = dest_mun, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
         addLayersControl(overlayGroups = unique(flows2$origins),
                          options = layersControlOptions(collapsed = T))%>%
@@ -1447,12 +1357,12 @@ server <- function(input, output) {
     
     if(isTruthy(child_inter_alloc)) {
       #Join warehouse coords --> I'm sorry Hadley Wickham
-      child_inter_alloc[,c("lon1", "lat1")] <- connections2[match(child_inter_alloc$Origin,connections2$Almacen),c("lon2", "lat2")]
-      child_inter_alloc[,c("lon2", "lat2")] <- connections2[match(child_inter_alloc$Destination,connections2$Almacen),c("lon2", "lat2")]
+      child_inter_alloc[,c("lon1", "lat1")] <- connections2[match(child_inter_alloc$Origin,connections2$dep_clean),c("lon2", "lat2")]
+      child_inter_alloc[,c("lon2", "lat2")] <- connections2[match(child_inter_alloc$Destination,connections2$dep_clean),c("lon2", "lat2")]
       
       
-      child_inter_flows <- gcIntermediate(child_inter_alloc[,c("lat1", "lon1")], 
-                                          child_inter_alloc[,c("lat2", "lon2")],
+      child_inter_flows <- gcIntermediate(child_inter_alloc[,c("lon1", "lat1")], 
+                                          child_inter_alloc[,c("lon2", "lat2")],
                                           sp = T,
                                           addStartEnd = T)
       
@@ -1473,11 +1383,11 @@ server <- function(input, output) {
       
       child_inter_origin_almacen <- child_inter_alloc |> 
         dplyr::select(Origin, lon1, lat1) |> 
-        st_as_sf(coords = c("lat1", "lon1"))
+        st_as_sf(coords = c("lon1", "lat1"))
       
       child_inter_dest_almacen <-  child_inter_alloc |> 
         dplyr::select(Destination, lon2, lat2) |> 
-        st_as_sf(coords = c("lat2", "lon2"))
+        st_as_sf(coords = c("lon2", "lat2"))
       
       
       out_leaf <- out_leaf %>%
