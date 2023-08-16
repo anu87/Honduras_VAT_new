@@ -8,6 +8,7 @@ child.vat.model <- function(days_allocated = child_days_allocated_value,
   master_key_child <- readRDS("appdata/master_key_child.rds")
   batch_list <- readRDS("appdata/batch_list_child.rds")
   mun_list <- readRDS("appdata/mun_list_child.rds")
+  full_info <- read_rds("appdata/full_info.rds")
   
   # #For some reason warehouse codes are not mapping properly --> manual fix for now
   # warehouse_codes$warehouse_code[warehouse_codes$Dep == "Lempira"] <- "O"

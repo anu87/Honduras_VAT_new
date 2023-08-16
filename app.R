@@ -871,24 +871,30 @@ server <- function(input, output) {
       
       allocation_joined <- left_join(allocation, connections2, by = "key") %>% as.tibble()
       
-      flows2 <- gcIntermediate(allocation_joined[,c("lon1", "lat1")], 
-                               allocation_joined[,c("lon2", "lat2")],
+      #Aggregate allocation by routes (multiple batches along one route currently not shown)
+      allocation_agg <- allocation_joined %>%
+        dplyr::group_by(dep_clean.x, mun_name.x, lon1, lat1, lon2, lat2) %>%
+        dplyr::summarise(vax_allocated = sum(vax_allocated),
+                         batch_num = paste(batch_num, collapse = ", "))
+      
+      flows2 <- gcIntermediate(allocation_agg[,c("lon1", "lat1")], 
+                               allocation_agg[,c("lon2", "lat2")],
                                sp = T,
                                addStartEnd = T)
       
-      flows2$Origin <- allocation_joined$dep_clean.x
-      flows2$Destination <- allocation_joined$mun_name.x
-      flows2$Suministro <- allocation_joined$Suministro
-      flows2$Batch_Num <- allocation_joined$batch_num
-      flows2$Time_to_Exp <- allocation_joined$time_to_exp
-      flows2$Vax_Allocated <- allocation_joined$vax_allocated
+      flows2$Origin <- allocation_agg$dep_clean.x
+      flows2$Destination <- allocation_agg$mun_name.x
+      #flows2$Suministro <- allocation_joined$Suministro
+      flows2$Batch_Num <- allocation_agg$batch_num
+      #flows2$Time_to_Exp <- allocation_joined$time_to_exp
+      flows2$Vax_Allocated <- allocation_agg$vax_allocated
       
       label_list <- list()
       popup_list <- list()
       for(i in 1:nrow(flows2)) {
         label_list[[i]] <- paste0(str_to_title(flows2$Origin[i]), " a ", flows2$Destination[i])
         popup_list[[i]] <- paste(glue::glue("<b>{str_to_title(flows2$Origin[i])} a {flows2$Destination[i]}</b>"),  
-                                 glue::glue("<i>Suministro</i>: {flows2$Suministro[i]}"),
+                                 #glue::glue("<i>Suministro</i>: {flows2$Suministro[i]}"),
                                  glue::glue("<i>Número de lote</i>: {flows2$Batch_Num[i]}"),
                                  glue::glue("<i>Vacunas Asignadas</i>: {flows2$Vax_Allocated[i]}"),
                                  sep = "</br>")
@@ -930,16 +936,22 @@ server <- function(input, output) {
       inter_alloc[,c("lon1", "lat1")] <- connections2[match(inter_alloc$Origin,connections2$dep_clean),c("lon2", "lat2")]
       inter_alloc[,c("lon2", "lat2")] <- connections2[match(inter_alloc$Destination,connections2$dep_clean),c("lon2", "lat2")]
       
+      #Aggregate intermediate allocation by routes (multiple batches along one route currently not shown)
+      inter_alloc_agg <- inter_alloc %>%
+        dplyr::group_by(Origin, Destination, lon1, lat1, lon2, lat2) %>%
+        dplyr::summarise(Allocated = sum(Allocated),
+                         `Batch Num` = paste(`Batch Num`, collapse = ", "))
       
-      inter_flows <- gcIntermediate(inter_alloc[,c("lon1", "lat1")], 
-                                    inter_alloc[,c("lon2", "lat2")],
+      
+      inter_flows <- gcIntermediate(inter_alloc_agg[,c("lon1", "lat1")], 
+                                    inter_alloc_agg[,c("lon2", "lat2")],
                                     sp = T,
                                     addStartEnd = T)
       
-      inter_flows$Origin <- inter_alloc$Origin
-      inter_flows$Destination <- inter_alloc$Destination
-      inter_flows$Batch_Num <- inter_alloc$`Batch Num`
-      inter_flows$Vax_Allocated <- inter_alloc$Allocated
+      inter_flows$Origin <- inter_alloc_agg$Origin
+      inter_flows$Destination <- inter_alloc_agg$Destination
+      inter_flows$Batch_Num <- inter_alloc_agg$`Batch Num`
+      inter_flows$Vax_Allocated <- inter_alloc_agg$Allocated
       
       inter_label_list <- list()
       inter_popup_list <- list()
@@ -952,11 +964,11 @@ server <- function(input, output) {
       }
       
       
-      inter_origin_almacen <-  inter_alloc |> 
+      inter_origin_almacen <-  inter_alloc_agg |> 
         dplyr::select(Origin, lon1, lat1) |> 
         st_as_sf(coords = c("lon1", "lat1"))
       
-      inter_dest_almacen <-  inter_alloc |> 
+      inter_dest_almacen <-  inter_alloc_agg |> 
         dplyr::select(Destination, lon2, lat2) |> 
         st_as_sf(coords = c("lon2", "lat2"))
       
@@ -1297,27 +1309,32 @@ server <- function(input, output) {
       
       child_alloc_joined <- left_join(child_allocation, connections2, by = c("key")) %>% as.tibble()
       
+      #Aggregate allocation by routes (multiple batches along one route currently not shown)
+      child_alloc_agg <- child_alloc_joined %>%
+        dplyr::group_by(dep_clean.x, mun_name.x, lon1, lat1, lon2, lat2) %>%
+        dplyr::summarise(vax_allocated = sum(vax_allocated),
+                         batch_num = paste(batch_num, collapse = ", "))
+
       
-      
-      flows2 <- gcIntermediate(child_alloc_joined[,c("lon1", "lat1")], 
-                               child_alloc_joined[,c("lon2", "lat2")],
+      flows2 <- gcIntermediate(child_alloc_agg[,c("lon1", "lat1")], 
+                               child_alloc_agg[,c("lon2", "lat2")],
                                sp = T,
                                addStartEnd = T)
       
       
-      flows2$Origin <- child_alloc_joined$dep_clean.x
-      flows2$Destination <- child_alloc_joined$mun_name.x
-      flows2$Suministro <- child_alloc_joined$Suministro
-      flows2$Batch_Num <- child_alloc_joined$batch_num
-      flows2$Time_to_Exp <- child_alloc_joined$time_to_exp
-      flows2$Vax_Allocated <- child_alloc_joined$vax_allocated
+      flows2$Origin <- child_alloc_agg$dep_clean.x
+      flows2$Destination <- child_alloc_agg$mun_name.x
+      #flows2$Suministro <- child_alloc_joined$Suministro
+      flows2$Batch_Num <- child_alloc_agg$batch_num
+      #flows2$Time_to_Exp <- child_alloc_joined$time_to_exp
+      flows2$Vax_Allocated <- child_alloc_agg$vax_allocated
       
       label_list <- list()
       popup_list <- list()
       for(i in 1:nrow(flows2)) {
         label_list[[i]] <- paste0(str_to_title(flows2$Origin[i]), " a ", flows2$Destination[i])
         popup_list[[i]] <- paste(glue::glue("<b>{str_to_title(flows2$Origin[i])} a {flows2$Destination[i]}</b>"),  
-                                 glue::glue("<i>Suministro</i>: {flows2$Suministro[i]}"),
+                                 #glue::glue("<i>Suministro</i>: {flows2$Suministro[i]}"),
                                  glue::glue("<i>Número de lote</i>: {flows2$Batch_Num[i]}"),
                                  glue::glue("<i>Vacunas Asignadas</i>: {flows2$Vax_Allocated[i]}"),
                                  sep = "</br>")
@@ -1325,7 +1342,7 @@ server <- function(input, output) {
       
       pal <- colorFactor(brewer.pal(4, "Set2"), flows2$Origin)
       
-      origin_almacen <-  connections2 |> 
+      origin_almacen <- connections2 |> 
         dplyr::select(dep_clean, lon2, lat2) |> 
         st_as_sf(coords = c("lon2", "lat2"))
       
@@ -1360,16 +1377,24 @@ server <- function(input, output) {
       child_inter_alloc[,c("lon1", "lat1")] <- connections2[match(child_inter_alloc$Origin,connections2$dep_clean),c("lon2", "lat2")]
       child_inter_alloc[,c("lon2", "lat2")] <- connections2[match(child_inter_alloc$Destination,connections2$dep_clean),c("lon2", "lat2")]
       
+      #Aggregate intermediate allocation by routes (multiple batches along one route currently not shown)
+      child_inter_alloc_agg <- child_inter_alloc %>%
+        dplyr::group_by(Origin, Destination, lon1, lat1, lon2, lat2) %>%
+        dplyr::summarise(Allocated = sum(Allocated),
+                         `Batch Num` = paste(`Batch Num`, collapse = ", ")) %>%
+        dplyr::ungroup()
+      
+      
       
       child_inter_flows <- gcIntermediate(child_inter_alloc[,c("lon1", "lat1")], 
                                           child_inter_alloc[,c("lon2", "lat2")],
                                           sp = T,
                                           addStartEnd = T)
       
-      child_inter_flows$Origin <- child_inter_alloc$Origin
-      child_inter_flows$Destination <- child_inter_alloc$Destination
-      child_inter_flows$Batch_Num <- child_inter_alloc$`Batch Num`
-      child_inter_flows$Vax_Allocated <- child_inter_alloc$Allocated
+      child_inter_flows$Origin <- child_inter_alloc_agg$Origin
+      child_inter_flows$Destination <- child_inter_alloc_agg$Destination
+      child_inter_flows$Batch_Num <- child_inter_alloc_agg$`Batch Num`
+      child_inter_flows$Vax_Allocated <- child_inter_alloc_agg$Allocated
       
       child_inter_label_list <- list()
       child_inter_popup_list <- list()
@@ -1381,11 +1406,11 @@ server <- function(input, output) {
                                        sep = "</br>")
       }
       
-      child_inter_origin_almacen <- child_inter_alloc |> 
+      child_inter_origin_almacen <- child_inter_alloc_agg |> 
         dplyr::select(Origin, lon1, lat1) |> 
         st_as_sf(coords = c("lon1", "lat1"))
       
-      child_inter_dest_almacen <-  child_inter_alloc |> 
+      child_inter_dest_almacen <-  child_inter_alloc_agg |> 
         dplyr::select(Destination, lon2, lat2) |> 
         st_as_sf(coords = c("lon2", "lat2"))
       

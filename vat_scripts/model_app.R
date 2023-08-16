@@ -11,6 +11,8 @@ vat.model <- function(days_allocated = days_allocated_value,
   #warehouse_codes <- readRDS("appdata/warehouse_codes_revised.rds") #Flag that this is manual
   vax_network_codes <- readRDS('appdata/site_mun_dep_codes.rds')
   connections <- readRDS("appdata/connections.rds")
+  full_info <- read_rds("appdata/full_info.rds")
+  
   warehouse_codes <- full_info %>%
     dplyr::select(dep_clean, warehouse_code) %>%
     distinct() %>%
