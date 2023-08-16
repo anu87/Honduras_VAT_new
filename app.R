@@ -435,9 +435,9 @@ server <- function(input, output) {
                    # label = hover,
                    group = ~origins, color = ~pal(origins)) %>%
       addCircleMarkers(data = origin_wh, radius = 2, label = ~as.character(`origin warehouse`)) |>
-      addCircleMarkers(data = dest_wh, radius = 1, color = 'red', label = ~as.character(`destination warehouse`)) |>
-      addLayersControl(overlayGroups = unique(flows$origins),
-                       options = layersControlOptions(collapsed = T))
+      addCircleMarkers(data = dest_wh, radius = 1, color = 'red', label = ~as.character(`destination warehouse`)) #|>
+      # addLayersControl(overlayGroups = unique(flows$origins),
+      #                  options = layersControlOptions(collapsed = T))
     
     flow_leaflet
     
@@ -477,9 +477,9 @@ server <- function(input, output) {
                    # label = hover,
                    group = ~origins, color = ~pal(origins)) %>%
       addCircleMarkers(data = origin_wh, radius = 1.5, label = ~as.character(dep_clean)) |>
-      addCircleMarkers(data = dest_wh, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
-      addLayersControl(overlayGroups = unique(flows$origins),
-                       options = layersControlOptions(collapsed = T))
+      addCircleMarkers(data = dest_wh, radius = 0.75, color = 'red', label = ~as.character(mun_name)) #|>
+      # addLayersControl(overlayGroups = unique(flows$origins),
+      #                  options = layersControlOptions(collapsed = T))
     
     out_leaf
 
@@ -504,7 +504,10 @@ server <- function(input, output) {
     uploaded_data <- readxl::read_xlsx(input$upload_new_vax_stock_data$datapath)
     print(uploaded_data)
     
-    salmi_data_updated$dat <- uploaded_data
+    #Add check to make sure data won't break the app
+    if(names(uploaded_data) == names(salmi_data) & all(uploaded_data$Dep %in% warehouse_codes$dep_clean) & all(is.numeric(uploaded_data$Cantidad))) {
+      salmi_data_updated$dat <- uploaded_data
+    }
     
   })
   
@@ -526,7 +529,11 @@ server <- function(input, output) {
       dplyr::mutate(exp_date = as.Date(exp_date)) %>%
       dplyr::mutate(time_to_exp  = as.numeric(exp_date - Sys.Date()))
 
-    salmi_data_updated$dat <- rhot_dat
+    
+    if(all(rhot_dat$Dep %in% warehouse_codes$dep_clean) & all(is.numeric(rhot_dat$Cantidad))) {
+      salmi_data_updated$dat <- rhot_dat
+    }
+    
   })
   
   #Historic-----
@@ -921,8 +928,8 @@ server <- function(input, output) {
                      group = ~Origin, color = ~pal(Origin)) %>%
         addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(dep_clean)) |>
         addCircleMarkers(data = dest_mun, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
-        addLayersControl(overlayGroups = unique(flows2$origins),
-                         options = layersControlOptions(collapsed = T))%>%
+        # addLayersControl(overlayGroups = unique(flows2$origins),
+        #                  options = layersControlOptions(collapsed = T))%>%
         addPolygons(data = adm2,
                     stroke = T,
                     color = "black",
@@ -1030,10 +1037,6 @@ server <- function(input, output) {
     #Regenerate the inputs if the warehouse data changed at all --> else use defaults
     
     if(isTruthy(updated_inventory)) { #Change to check if warehouse data changed or not
-      
-      
-      
-      #warehouse_codes <- read_rds("appdata/warehouse_codes_revised.rds")
       
       salmi_inventory3 <- left_join(updated_inventory, warehouse_codes, by = c("Dep" = "dep_clean")) %>%
         dplyr::filter(category == "vaccine")
@@ -1361,8 +1364,8 @@ server <- function(input, output) {
                      group = ~Origin, color = ~pal(Origin)) %>%
         addCircleMarkers(data = origin_almacen, radius = 1.5, label = ~as.character(dep_clean)) |>
         addCircleMarkers(data = dest_mun, radius = 0.75, color = 'red', label = ~as.character(mun_name)) |>
-        addLayersControl(overlayGroups = unique(flows2$origins),
-                         options = layersControlOptions(collapsed = T))%>%
+        # addLayersControl(overlayGroups = unique(flows2$origins),
+        #                  options = layersControlOptions(collapsed = T))%>%
         addPolygons(data = adm2,
                     stroke = T,
                     color = "black",
