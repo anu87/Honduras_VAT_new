@@ -505,9 +505,9 @@ server <- function(input, output) {
     print(uploaded_data)
     
     #Add check to make sure data won't break the app
-    if(names(uploaded_data) == names(salmi_data) & all(uploaded_data$Dep %in% warehouse_codes$dep_clean) & all(is.numeric(uploaded_data$Cantidad))) {
+    #if(names(uploaded_data) == names(salmi_data) & all(uploaded_data$Dep %in% warehouse_codes$dep_clean) & all(is.numeric(uploaded_data$Cantidad))) {
       salmi_data_updated$dat <- uploaded_data
-    }
+    #}
     
   })
   
@@ -530,9 +530,9 @@ server <- function(input, output) {
       dplyr::mutate(time_to_exp  = as.numeric(exp_date - Sys.Date()))
 
     
-    if(all(rhot_dat$Dep %in% warehouse_codes$dep_clean) & all(is.numeric(rhot_dat$Cantidad))) {
+    #if(all(rhot_dat$Dep %in% warehouse_codes$dep_clean) & all(is.numeric(rhot_dat$Cantidad))) {
       salmi_data_updated$dat <- rhot_dat
-    }
+    #}
     
   })
   
