@@ -355,7 +355,7 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                              column(3,
                                     #p(strong(i18n$t(""))),
                                     sliderInput("historic_slider", i18n$t("Select the Month:"), 
-                                                min = my("01-2021"), max = my("12-2021"), value = my("01-2021"), 
+                                                min = my("01-2022"), max = my("12-2022"), value = my("01-2022"), 
                                                 timeFormat = "%m-%y"),
                                     selectInput("age_variable_select", label = i18n$t("Select the Age:"),
                                                 choices = c("Adulto", "Pediátrica")),#, "Total")),
@@ -1404,9 +1404,9 @@ server <- function(input, output) {
         dplyr::ungroup()
       
       
-      
-      child_inter_flows <- gcIntermediate(child_inter_alloc[,c("lon1", "lat1")], 
-                                          child_inter_alloc[,c("lon2", "lat2")],
+      #FLAG TO TROUBLESHOOT LONGER ALLOCS
+      child_inter_flows <- gcIntermediate(child_inter_alloc_agg[,c("lon1", "lat1")], 
+                                          child_inter_alloc_agg[,c("lon2", "lat2")],
                                           sp = T,
                                           addStartEnd = T)
       
