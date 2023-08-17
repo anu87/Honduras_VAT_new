@@ -2,12 +2,12 @@
 Select language,Seleccionar idioma
 Vaccine Allocation Tool,Herramienta de asignación de vacunas
 Home,Inicio 
-Vaccine Stock Data,Datos sobre existencias de vacunas
+Vaccine Stock Data,Datos de existencias
 Distribution Network,Red de distribución
-Proposed Distribution -- Adults,Distribución propuesta -- Adultos
-Proposed Distribution -- Children,Distribución propuesta -- Pediátricos
+Proposed Distribution -- Adults,Distribución propuesta: adultos
+Proposed Distribution -- Children,Distribución propuesta: pediátricos
 Historic Data,Datos históricos
-Model Documentation,Documentación del modelo
+Model Documentation,Documentación
 Honduras Vaccine Allocation Tool,Herramienta de asignación de vacunas en Honduras
 Data Overview,Resumen de datos
 "The vaccine allocation tool is an interactive tool that takes in data from multiple sources, optimizes for various supply and demand-side constraints and generates a recommended vaccine allocation per site. The final goal of this tool is to maximize vaccine coverage in priority population and minimize any vaccine wastage.","La herramienta de asignación de vacunas es una herramienta interactiva que toma datos de múltiples fuentes, optimiza las diversas limitaciones de la oferta y la demanda y genera una asignación de vacunas recomendada por centro. El objetivo final de esta herramienta es maximizar la cobertura vacunal en la población prioritaria y minimizar cualquier desperdicio de vacunas."
@@ -52,3 +52,4 @@ Batch size: the amount of vaccines distributed must be less than the number of v
 Vaccine allocation should be distributed evenly across vaccination sites: all vaccination sites should receive vaccines for at least a certain percentage of the population they serve.,La asignación de vacunas debe distribuirse uniformemente entre los centros de vacunación: todos los centros de vacunación deben recibir vacunas para al menos un determinado porcentaje de la población a la que atienden.
 Regional Warehouses to Municipalities,Almacenes regionales a los municipios
 Please press the button below to run the vaccine allocation model.,Pulse el botón siguiente para ejecutar el modelo de asignación de vacunas.
+Proposed Distribution,Distribución propuesta

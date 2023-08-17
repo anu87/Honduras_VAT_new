@@ -23,6 +23,7 @@ library(writexl)
 library(zoo)
 library(tidyverse)
 library(stringi)
+library(shinythemes)
 
 #setwd("~/Honduras_VAT/Honduras_VAT")
 
@@ -151,7 +152,9 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                                    selected = "es"#i18n$get_key_translation()
                 ),
                 style = "width:75px; position:fixed; right:40px; top:-20px"),#title =i18n$t("Vaccine Allocation Tool"),
-                theme = honduras_theme,
+                #theme = honduras_theme,
+                #textOutput("title"),
+                theme = shinytheme("flatly"),
                 #position = "fixed-top",
                 #Home Page ---------
                 tabPanel(i18n$t("Home"),
@@ -244,6 +247,7 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                          )
                 ),
                 
+                navbarMenu(i18n$t("Proposed Distribution"),
                 #Proposed Distribution Page -------------
                 tabPanel(title = i18n$t("Proposed Distribution -- Adults"),
                          fluidPage(
@@ -339,7 +343,7 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                            #   leafletOutput("prop_dist_filt", height = 600)
                            # )
                          )
-                ),
+                )),
                 
                 #Historic Data Page ----------
                 tabPanel(title = i18n$t("Historic Data"),
@@ -394,6 +398,16 @@ server <- function(input, output) {
     update_lang(input$selected_language)
   })
   
+  #### Reactive NavBar ####
+  # output$title <- renderText({
+  #   if(input$selected_language=="en"){
+  #     paste("Honduras Vaccine Allocation Tool")
+  #   }
+  #   else if(input$languageselection=="es"){
+  #     paste("Herramienta de asignación de vacunas")
+  #   }
+  # })
+  # 
   
   
   # network map ----------
@@ -788,7 +802,6 @@ server <- function(input, output) {
       # relocate(Suministro, .after = Almacen)
     saveRDS(allocation, "appdata/allocation.rds")
     
-    #IK FLAG STOPPING POINT 8/16
     connections_key <- connections2 %>% 
       filter(warehouse_code != "A")
     
