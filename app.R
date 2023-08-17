@@ -552,7 +552,8 @@ server <- function(input, output) {
   
   #Historic-----
   output$historic_data_dt <- DT::renderDataTable({
-    DT::datatable(historic_site_data)
+    DT::datatable(historic_site_data, 
+                  options = list(language = list(url = 'https://cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')))
   })
   
   
@@ -858,7 +859,8 @@ server <- function(input, output) {
   
   # display the model finished message-------
   
-  proposed_distribution <- reactiveValues(dt = DT::datatable(salmi_data))
+  proposed_distribution <- reactiveValues(dt = DT::datatable(salmi_data,
+                                                             options = list(language = list(url = 'https://cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json'))))
   
   observeEvent(input$run_model, {
     toggle('run_model_message')
@@ -1298,7 +1300,8 @@ server <- function(input, output) {
   
   # display the model finished message-------
   
-  child_proposed_distribution <- reactiveValues(dt = DT::datatable(salmi_data))
+  child_proposed_distribution <- reactiveValues(dt = DT::datatable(salmi_data, 
+                                                                   options = list(language = list(url = 'https://cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json'))))
   
   observeEvent(input$child_run_model, {
     toggle('child_run_model_message')
