@@ -17,6 +17,7 @@ library(tibble)
 library(MASS)
 library(readr)
 library(stringr)
+library(scales)
 library(stringi)
 library(readxl)
 library(writexl)
@@ -360,7 +361,7 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                     selectInput("age_variable_select", label = i18n$t("Select the Age:"),
                                                 choices = c("Adulto", "Pediátrica")),#, "Total")),
                                     selectInput("dose_variable_select", label = i18n$t("Select the Dose:"),
-                                                choices = c("1R", "R1", "1ra", "2R", "R2", "2da"))
+                                                choices = unique(historic_site_data$Dos))
                              ),
                              column(9,
                                     leafletOutput("historic_data_tmap"),
@@ -1404,7 +1405,7 @@ server <- function(input, output) {
         dplyr::ungroup()
       
       
-      #FLAG TO TROUBLESHOOT LONGER ALLOCS
+      #FLAG TO TROUBLESHOOT LONGER ALLOCS if that still breaks 
       child_inter_flows <- gcIntermediate(child_inter_alloc_agg[,c("lon1", "lat1")], 
                                           child_inter_alloc_agg[,c("lon2", "lat2")],
                                           sp = T,
@@ -1538,7 +1539,7 @@ server <- function(input, output) {
                        stroke = T,
                        weight = 1,
                        color = "black",
-                       radius = ~(num_doses/200),
+                       radius = ~(scales::rescale(num_doses, to = c(1,20))), #Need radius that maxes out at like 20 ish
                        popup = paste0(filtered_sites$`Nombre US`,
                                       "<br>",
                                       "Número de Dosis: ", 

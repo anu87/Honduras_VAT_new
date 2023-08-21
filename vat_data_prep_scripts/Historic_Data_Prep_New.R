@@ -121,12 +121,15 @@ site_hist <- joined_site_hist %>%
 
 # fix Dos nomenclature - 1R = R1; 2R = R2
 
+site_hist$Dos %>% table()
+
 site_hist <- site_hist |> 
   mutate(Dos = case_when(
     Dos == 'R1' ~ '1R',
     Dos == 'R2' ~ '2R',
     .default = Dos
   ))
+
 
 # separate site code
 
@@ -138,7 +141,7 @@ site_hist <- site_hist |>
 
 #Export
 saveRDS(site_hist, "data/Site_Hist.rds")
-
+saveRDS(site_hist, "appdata/Site_Hist.rds")
 
 
 #Create Level 2 data output --> filter raw hist to level 2 ------
@@ -379,53 +382,4 @@ joined_site <- left_join(vax_sites, pivoted_site_data, by = "tmp_code")
 joined_sites <- joined_site
 saveRDS(joined_sites, "data/joined_sites.rds")
 
-
-# distribution network data -----------------------------------------------
-
-# 
-# #Now the warehouse connections
-# connections <- readxl::read_xlsx("data/travel time matrix between warehouses.xlsx", sheet = 2)
-# 
-# # remove rows where origin and destination warehouse are the same
-# connections <- connections |> 
-#   filter(if_all(`origin warehouse`, ~.x != `destination warehouse`))
-# 
-# 
-# 
-# names(connections)
-# flows <- gcIntermediate(connections[,c("Latitude1", "Longitude1")], 
-#                connections[,c("Latitude2", "Longitude2")],
-#                sp = T,
-#                addStartEnd = T)
-# flows$Hours <- connections$Hours
-# flows$origins <- connections$`origin warehouse`
-# flows$destinations <- connections$`destination warehouse`
-# 
-# 
-# hover <- paste0(flows$origins, " a ", 
-#                 flows$destinations, ': ')
-# 
-# pal <- colorFactor(brewer.pal(4, "Set2"), flows$origins)
-# 
-# origin_wh <-  connections |> 
-#   dplyr::select(`origin warehouse`, Longitude1, Latitude1) |> 
-#   st_as_sf(coords = c("Latitude1", "Longitude1"))
-# 
-# dest_wh <-  connections |> 
-#   filter(!(`destination warehouse` %in% `origin warehouse`)) |> 
-#   dplyr::select(`destination warehouse`, Longitude2, Latitude2) |> 
-#   st_as_sf(coords = c("Latitude2", "Longitude2"))
-# 
-# flow_leaflet <-leaflet() %>%
-#   addProviderTiles("OpenStreetMap") %>%
-#   addPolylines(data = flows, 
-#                # label = hover,
-#                group = ~origins, color = ~pal(origins)) %>%
-#   addCircleMarkers(data = origin_wh, radius = 2, label = ~as.character(`origin warehouse`)) |>
-#   addCircleMarkers(data = dest_wh, radius = 1, color = 'red', label = ~as.character(`destination warehouse`)) |>
-#   addLayersControl(overlayGroups = unique(flows$origins),
-#                    options = layersControlOptions(collapsed = T))
-# 
-# flow_leaflet
-# saveRDS(flow_leaflet, "data/flow_leaflet.rds")
 
