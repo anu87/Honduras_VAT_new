@@ -75,11 +75,11 @@ salmi_data <- salmi_data %>%
 
 #Read files relevant to regenerating optimization
 # site level historical vaccination data
-site_vax <- readRDS("data/Site_Hist.rds")
-Municipio_Hist <- readRDS("data/Municipio_Hist.rds")
-Mun_shp_vax <- readRDS("data/joined_adm2.rds")
+site_vax <- readRDS("appdata/Site_Hist.rds")
+Municipio_Hist <- readRDS("appdata/Municipio_Hist.rds")
+Mun_shp_vax <- readRDS("appdata/joined_adm2.rds")
 vax_network_codes <- readRDS('data/site_mun_dep_codes.rds')
-site_hist <- readRDS("data/Site_Hist.rds")
+site_hist <- readRDS("appdata/Site_Hist.rds")
 mun_avg_vax_rate <- readRDS('data/mun_avg_vax_rate.rds')
 
 connections2 <- readRDS("appdata/connections.rds") 
@@ -1483,7 +1483,7 @@ server <- function(input, output) {
   output$historic_data_tmap <- renderLeaflet({
     sc <- selected_col()
     
-    if(sc %in% names(joined_site)){
+    if(sc %in% names(joined_sites)){
       #Filter out sites missing data
       filtered_sites <- joined_sites %>%
         dplyr::filter(!is.na(st_drop_geometry(joined_sites[,!!sc])))
