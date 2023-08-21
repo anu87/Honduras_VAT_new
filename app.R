@@ -586,7 +586,7 @@ server <- function(input, output) {
     dose <- input$dose_variable_select
     
     out <- paste(final_month, final_age, dose, sep = "_")
-    
+
     return(out)
   })
   # VAT model ---------------------------------------------------------------
@@ -1483,67 +1483,76 @@ server <- function(input, output) {
   output$historic_data_tmap <- renderLeaflet({
     sc <- selected_col()
     
-    #Filter out sites missing data
-    filtered_sites <- joined_sites %>%
-      dplyr::filter(!is.na(st_drop_geometry(joined_sites[,!!sc])))
-    filtered_sites$num_doses <- as.numeric(unlist(st_drop_geometry(filtered_sites[,sc])))
-    filtered_sites <- filtered_sites %>%
-      dplyr::select(num_doses, codigo_us, `Nombre US`)
-    
-    filtered_dep <- historic_dep_data%>%
-      dplyr::filter(!is.na(st_drop_geometry(historic_dep_data[,!!sc])))
-    filtered_dep$num_doses <- as.numeric(unlist(st_drop_geometry(filtered_dep[,sc])))
-    filtered_dep <- filtered_dep %>%
-      dplyr::select(num_doses, ADM1_ES) 
-    # 
-    # dep_quants <- quantile(filtered_dep$num_doses, probs = seq(0,1,0.2))
-    # filtered_dep$quantile <- cut(filtered_dep$num_doses, dep_quants, include.lowest = T)
-    # new_levs <- sapply(levels(filtered_dep$quantile), 
-    #        function(x){
-    #          tmp <- gsub("\\[|\\]|\\(|\\)", "", x)
-    #          tmp <- sub(",", "dos - ", tmp)
-    #          tmp <- paste0(tmp, "dos")
-    #          return(tmp)
-    #        })
-    # levels(filtered_dep$quantile) <- new_levs
-    # 
-    filtered_mun <- historic_mun_data%>%
-      dplyr::filter(!is.na(st_drop_geometry(historic_mun_data[,!!sc])))
-    filtered_mun$num_doses <- as.numeric(unlist(st_drop_geometry(filtered_mun[,sc])))
-    filtered_mun <- filtered_mun %>%
-      dplyr::select(num_doses)
-    
-    pal <- colorBin("Greens", domain = filtered_dep$num_doses)
-    
-    leaflet(filtered_dep) %>%
-      addProviderTiles("OpenStreetMap") %>%
-      addPolygons(fillColor = ~pal(num_doses), #Need to change palette to jenks
-                  weight = 1,
-                  opacity = 1,
-                  color = "black",
-                  #dashArray = "3",
-                  fillOpacity = 0.8,
-                  popup = paste0("Departamento: ", 
-                                 filtered_dep$ADM1_ES,
-                                 "<br>",
-                                 "Número de Dosis: ", 
-                                 filtered_dep$num_doses)) %>%
-      addLegend(pal = pal, 
-                values = ~num_doses, 
-                opacity = 0.7, 
-                title = "Número de Dosis",
-                position = "topright") %>%
-      addCircleMarkers(data = filtered_sites,
-                       fill = T,
-                       fillOpacity = 0.001,
-                       stroke = T,
-                       weight = 1,
-                       color = "black",
-                       radius = ~(scales::rescale(num_doses, to = c(1,20))), #Need radius that maxes out at like 20 ish
-                       popup = paste0(filtered_sites$`Nombre US`,
-                                      "<br>",
-                                      "Número de Dosis: ", 
-                                      filtered_sites$num_doses)) 
+    if(sc %in% names(joined_site)){
+      #Filter out sites missing data
+      filtered_sites <- joined_sites %>%
+        dplyr::filter(!is.na(st_drop_geometry(joined_sites[,!!sc])))
+      filtered_sites$num_doses <- as.numeric(unlist(st_drop_geometry(filtered_sites[,sc])))
+      filtered_sites <- filtered_sites %>%
+        dplyr::select(num_doses, codigo_us, `Nombre US`)
+      
+      if(sum(filtered_sites$num_doses) > 0) {
+        
+        filtered_dep <- historic_dep_data%>%
+          dplyr::filter(!is.na(st_drop_geometry(historic_dep_data[,!!sc])))
+        filtered_dep$num_doses <- as.numeric(unlist(st_drop_geometry(filtered_dep[,sc])))
+        filtered_dep <- filtered_dep %>%
+          dplyr::select(num_doses, ADM1_ES) 
+        # 
+        # dep_quants <- quantile(filtered_dep$num_doses, probs = seq(0,1,0.2))
+        # filtered_dep$quantile <- cut(filtered_dep$num_doses, dep_quants, include.lowest = T)
+        # new_levs <- sapply(levels(filtered_dep$quantile), 
+        #        function(x){
+        #          tmp <- gsub("\\[|\\]|\\(|\\)", "", x)
+        #          tmp <- sub(",", "dos - ", tmp)
+        #          tmp <- paste0(tmp, "dos")
+        #          return(tmp)
+        #        })
+        # levels(filtered_dep$quantile) <- new_levs
+        # 
+        filtered_mun <- historic_mun_data%>%
+          dplyr::filter(!is.na(st_drop_geometry(historic_mun_data[,!!sc])))
+        filtered_mun$num_doses <- as.numeric(unlist(st_drop_geometry(filtered_mun[,sc])))
+        filtered_mun <- filtered_mun %>%
+          dplyr::select(num_doses)
+        
+        pal <- colorBin("Greens", domain = filtered_dep$num_doses)
+        
+        print(filtered_dep)
+        
+        leaflet(filtered_dep) %>%
+          addProviderTiles("OpenStreetMap") %>%
+          addPolygons(fillColor = ~pal(num_doses), #Need to change palette to jenks
+                      weight = 1,
+                      opacity = 1,
+                      color = "black",
+                      #dashArray = "3",
+                      fillOpacity = 0.8,
+                      popup = paste0("Departamento: ", 
+                                     filtered_dep$ADM1_ES,
+                                     "<br>",
+                                     "Número de Dosis: ", 
+                                     filtered_dep$num_doses)) %>%
+          addLegend(pal = pal, 
+                    values = ~num_doses, 
+                    opacity = 0.7, 
+                    title = "Número de Dosis",
+                    position = "topright") %>%
+          addCircleMarkers(data = filtered_sites,
+                           fill = T,
+                           fillOpacity = 0.001,
+                           stroke = T,
+                           weight = 1,
+                           color = "black",
+                           radius = ~(scales::rescale(num_doses, to = c(1,20))), #Need radius that maxes out at like 20 ish
+                           popup = paste0(filtered_sites$`Nombre US`,
+                                          "<br>",
+                                          "Número de Dosis: ", 
+                                          filtered_sites$num_doses))
+      }
+      
+    }
+     
   })
   
   #Show save success message when new data saved

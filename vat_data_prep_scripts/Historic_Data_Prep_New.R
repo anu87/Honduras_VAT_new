@@ -192,6 +192,7 @@ lev2_hist = lev2_hist |>
 
 #Export
 saveRDS(lev2_hist, "data/Municipio_Hist.rds")
+saveRDS(lev2_hist, "appdata/Municipio_Hist.rds")
 
 #First two rows and last row don't count
 raw_lev1_hist <- raw_hist[(which(geog_type == "Level 1") + 2),]
@@ -216,14 +217,23 @@ lev1_hist <- pivoted_raw_lev1_hist %>%
   dplyr::rename(Dep = `Departamento/Municipio/ES_Adulto_1ra`) %>%
   dplyr::select(Dep, Mes, Edad, Dos, Num_Doses,)
 
+lev1_hist = lev1_hist |> 
+  mutate(Dos = case_when(
+    Dos == 'R1' ~ '1R',
+    Dos == 'R2' ~ '2R',
+    .default = Dos
+  ))
+
+
 #Export
 saveRDS(lev1_hist, "data/Departamento_Hist.rds")
+saveRDS(lev1_hist, "appdata/Departamento_Hist.rds")
 
 
 #Join shapefiles to data ---------
-historic_mun_data <- readRDS("data/Municipio_Hist.rds")
-historic_dep_data <- readRDS("data/Departamento_Hist.rds")
-admin2_bounds <- readRDS('data/Adm2_w_Pops.rds')
+historic_mun_data <- readRDS("appdata/Municipio_Hist.rds")
+historic_dep_data <- readRDS("appdata/Departamento_Hist.rds")
+admin2_bounds <- readRDS('appdata/Adm2_w_Pops.rds')
 
 admin1_bounds <- st_read("data/hnd_adm_sinit_20161005_SHP/hnd_admbnda_adm1_sinit_20161005.shp")
 
@@ -244,6 +254,7 @@ for(i in seq_along(missing_muns)) {
   tmp_change_name <- gsub("ó", "o", tmp_change_name)
   tmp_change_name <- gsub("í", "i", tmp_change_name)
   tmp_change_name <- gsub("é", "e", tmp_change_name)
+  tmp_change_name <- gsub("ú", "u", tmp_change_name)
   
   if(tmp_change_name %in%admin2_bounds$ADM2_ES) {
     historic_mun_data$Mun2[historic_mun_data$Mun2 == this_mun] <- tmp_change_name
@@ -280,6 +291,14 @@ admin2_bounds$ADM2_ES[170] <- "San Juan Intibuca"
 admin2_bounds$ADM2_ES[238] <- "San Juan La Paz"
 #historic_mun_data$Mun[historic_mun_data$Mun == "San Júan"] <- "" #need to figure out which one it is
 
+#Need to ditch the accents from some of these to fix join
+historic_mun_data$Mun2 <- gsub("á", "a", historic_mun_data$Mun2)
+historic_mun_data$Mun2 <- gsub("ó", "o", historic_mun_data$Mun2)
+historic_mun_data$Mun2 <- gsub("í", "i", historic_mun_data$Mun2)
+historic_mun_data$Mun2 <- gsub("é", "e", historic_mun_data$Mun2)
+historic_mun_data$Mun2 <- gsub("ú", "u", historic_mun_data$Mun2)
+
+
 # for optimization model
 municipio_vax <- historic_mun_data |>
   filter(!(is.na(Mun))) |> 
@@ -291,17 +310,21 @@ municipio_vax <- municipio_vax |>
 
 #Arbitrarily filter the data to remove dupes --> need to fix later
 historic_mun_data <- historic_mun_data %>%
-  dplyr::mutate(unique_id = paste(Mun, Mun2, Mes, Edad, Dos, sep = "_")) %>%
+  dplyr::mutate(unique_id = paste(Mun2, Mes, Edad, Dos, sep = "_")) %>%
   dplyr::filter(!duplicated(unique_id)) %>%
   dplyr::select(-unique_id)
 
 #Re-pivot the data
 pivoted_hist_mun_data <- historic_mun_data %>%
+  dplyr::select(-Mun) %>%
   pivot_wider(names_from = c(Mes, Edad, Dos), 
               values_from = Num_Doses) 
 
 joined_adm2 <- left_join(admin2_bounds, pivoted_hist_mun_data, by = c("ADM2_ES" = "Mun2"))
+
 saveRDS(joined_adm2, "data/joined_adm2.rds")
+saveRDS(joined_adm2, "appdata/joined_adm2.rds")
+
 
 historic_dep_data$Dep <- sub("Departamental de ", "", historic_dep_data$Dep)
 unique(historic_dep_data$Dep) %in% admin1_bounds$ADM1_ES
@@ -314,6 +337,7 @@ for(i in seq_along(missing_deps)) {
   tmp_change_name <- gsub("ó", "o", tmp_change_name)
   tmp_change_name <- gsub("í", "i", tmp_change_name)
   tmp_change_name <- gsub("é", "e", tmp_change_name)
+  tmp_change_name <- gsub("ú", "u", tmp_change_name)
   
   if(tmp_change_name %in%admin1_bounds$ADM1_ES) {
     historic_dep_data$Dep[historic_dep_data$Dep == this_dep] <- tmp_change_name
@@ -363,11 +387,12 @@ joined_adm1 <- left_join(admin1_bounds, pivoted_hist_dep_data, by = c("ADM1_ES" 
 joined_adm1 <- st_simplify(joined_adm1, dTolerance = 1000)
 
 saveRDS(joined_adm1, "data/joined_adm1.rds")
+saveRDS(joined_adm1, "appdata/joined_adm1.rds")
 
 
 #Connect the site data
 vax_sites <- readRDS("data/Sites_w_Coords.rds")
-historic_site_data <- readRDS("data/Site_Hist.rds")
+historic_site_data <- readRDS("appdata/Site_Hist.rds")
 
 #Re-pivot the data
 pivoted_site_data <- historic_site_data %>%
@@ -381,5 +406,9 @@ pivoted_site_data$tmp_code <- gsub(" - .*", "", pivoted_site_data$Sitio)
 joined_site <- left_join(vax_sites, pivoted_site_data, by = "tmp_code")
 joined_sites <- joined_site
 saveRDS(joined_sites, "data/joined_sites.rds")
+saveRDS(joined_sites, "appdata/joined_sites.rds")
+
+substring(names(joined_sites)[12:ncol(joined_sites)], nchar(names(joined_sites)[12:ncol(joined_sites)]) - 1,  nchar(names(joined_sites)[12:ncol(joined_sites)])) %>% table()
+
 
 
