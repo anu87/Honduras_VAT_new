@@ -70,7 +70,8 @@ connections <- readxl::read_xlsx("appdata/travel time matrix between warehouses.
 
 salmi_data <- read_rds("appdata/salmi_inventory2.rds")
 salmi_data <- salmi_data %>% 
-  dplyr::mutate(time_to_exp = as.numeric(time_to_exp))
+  dplyr::mutate(time_to_exp = as.numeric(time_to_exp)) %>%
+  dplyr::filter(exp_date > Sys.Date())
 
 
 #Read files relevant to regenerating optimization
@@ -200,7 +201,7 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                              h5(i18n$t("Edit the table to change stock input data")),
                              status = "warning", solidHeader = TRUE, collapsible = FALSE,
                              tags$br(), tags$br(),
-                             rHandsontableOutput("vax_stock_rhot"),
+                             rHandsontableOutput("vax_stock_rhot", height = 600),
                              #DT::DTOutput("vax_stock_rhot"), #Temp replacement
                              tags$br(), tags$br(),
                              #h5(i18n$t("Once you have updated the table above, please save your changes.")),
@@ -1230,9 +1231,6 @@ server <- function(input, output) {
       saveRDS(batch_list, "appdata/batch_list_child.rds")
       
     }
-    
-    
-    
     
     child_allocation <- child.vat.model(days_allocated = child_days_allocated_value,
                                         salmi_inventory2 = salmi_data_updated$dat)
