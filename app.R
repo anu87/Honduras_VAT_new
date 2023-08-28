@@ -362,7 +362,8 @@ ui <- fluidPage(tagList(shiny.i18n::usei18n(i18n)),
                                     selectInput("age_variable_select", label = i18n$t("Select the Age:"),
                                                 choices = c("Adulto", "Pediátrica")),#, "Total")),
                                     selectInput("dose_variable_select", label = i18n$t("Select the Dose:"),
-                                                choices = unique(historic_site_data$Dos))
+                                                choices = unique(historic_site_data$Dos),
+                                                selected = "1ra")
                              ),
                              column(9,
                                     leafletOutput("historic_data_tmap"),
